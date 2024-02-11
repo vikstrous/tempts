@@ -34,6 +34,60 @@ func (a ActivityWithImpl) validate(q *Queue, v *ValidationState) error {
 	return nil
 }
 
+type Activity0 struct {
+	Name  string
+	queue *Queue
+}
+
+func NewActivity0(q *Queue, name string) Activity0 {
+	q.registerActivity(name, (func(context.Context) error)(nil))
+	return Activity0{Name: name, queue: q}
+}
+
+func (a Activity0) WithImplementation(fn func(context.Context) error) *ActivityWithImpl {
+	return &ActivityWithImpl{activityName: a.Name, queue: a.queue, fn: fn}
+}
+
+func (a Activity0) Run(ctx workflow.Context) error {
+	return a.Execute(ctx).Get(ctx, nil)
+}
+
+func (a Activity0) Execute(ctx workflow.Context) workflow.Future {
+	return workflow.ExecuteActivity(workflow.WithWorkflowNamespace(workflow.WithTaskQueue(ctx, a.queue.name), a.queue.namespace.name), a.Name)
+}
+
+func (a Activity0) Register(w worker.ActivityRegistry, fn func(context.Context) error) {
+	w.RegisterActivityWithOptions(fn, activity.RegisterOptions{Name: a.Name})
+}
+
+type Activity0R[Return any] struct {
+	Name  string
+	queue *Queue
+}
+
+func NewActivity0R[Return any](q *Queue, name string) Activity0R[Return] {
+	q.registerActivity(name, (func(context.Context) (Return, error))(nil))
+	return Activity0R[Return]{Name: name, queue: q}
+}
+
+func (a Activity0R[Return]) WithImplementation(fn func(context.Context) (Return, error)) *ActivityWithImpl {
+	return &ActivityWithImpl{activityName: a.Name, queue: a.queue, fn: fn}
+}
+
+func (a Activity0R[Return]) Run(ctx workflow.Context) (Return, error) {
+	var ret Return
+	err := a.Execute(ctx).Get(ctx, &ret)
+	return ret, err
+}
+
+func (a Activity0R[Return]) Execute(ctx workflow.Context) workflow.Future {
+	return workflow.ExecuteActivity(workflow.WithWorkflowNamespace(workflow.WithTaskQueue(ctx, a.queue.name), a.queue.namespace.name), a.Name)
+}
+
+func (a Activity0R[Return]) Register(w worker.ActivityRegistry, fn func(context.Context) (Return, error)) {
+	w.RegisterActivityWithOptions(fn, activity.RegisterOptions{Name: a.Name})
+}
+
 type Activity1[Param any] struct {
 	Name  string
 	queue *Queue
