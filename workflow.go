@@ -104,6 +104,64 @@ func setSchedule(ctx context.Context, temporalClient *Client, opts client.Schedu
 	return nil
 }
 
+type Workflow0 struct {
+	Name  string
+	queue *Queue
+}
+
+func NewWorkflow0(queue *Queue, name string) Workflow0 {
+	queue.registerWorkflow(name, (func(context.Context) error)(nil))
+	return Workflow0{
+		Name:  name,
+		queue: queue,
+	}
+}
+
+func (w Workflow0) WithImplementation(fn func(workflow.Context) error) *WorkflowWithImpl {
+	return &WorkflowWithImpl{workflowName: w.Name, queue: *w.queue, fn: fn}
+}
+
+func (w Workflow0) Register(wr worker.WorkflowRegistry, fn func(workflow.Context) error) {
+	wr.RegisterWorkflowWithOptions(fn, workflow.RegisterOptions{
+		Name: w.Name,
+	})
+}
+func (w Workflow0) RunChild(ctx workflow.Context, opts workflow.ChildWorkflowOptions) error {
+	err := w.ExecuteChild(ctx, opts).Get(ctx, nil)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (w Workflow0) ExecuteChild(ctx workflow.Context, opts workflow.ChildWorkflowOptions) workflow.ChildWorkflowFuture {
+	opts.TaskQueue = w.queue.name
+	opts.Namespace = w.queue.namespace.name
+	return workflow.ExecuteChildWorkflow(workflow.WithChildOptions(ctx, opts), w.Name)
+}
+
+func (w Workflow0) SetSchedule(ctx context.Context, temporalClient *Client, opts client.ScheduleOptions) error {
+	return setSchedule(ctx, temporalClient, opts, w.Name, w.queue, []any{})
+}
+
+func (w Workflow0) Run(ctx context.Context, temporalClient *Client, opts client.StartWorkflowOptions) error {
+	r, err := w.Execute(ctx, temporalClient, opts)
+	if err != nil {
+		return err
+	}
+	err = r.Get(ctx, nil)
+	return err
+}
+
+func (w Workflow0) Execute(ctx context.Context, temporalClient *Client, opts client.StartWorkflowOptions) (client.WorkflowRun, error) {
+	opts.TaskQueue = w.queue.name
+	if w.queue.namespace.name != temporalClient.namespace {
+		// The user must provide a client that's connected to the right namespace to be able to start this workflow.
+		return nil, fmt.Errorf("wrong namespace for client %s vs workflow %s", temporalClient.namespace, w.queue.namespace.name)
+	}
+	return temporalClient.Client.ExecuteWorkflow(ctx, opts, w.Name)
+}
+
 type Workflow0R[Return any] struct {
 	Name  string
 	queue *Queue
@@ -145,46 +203,23 @@ func (w Workflow0R[Return]) Execute(ctx context.Context, temporalClient *Client,
 	}
 	return temporalClient.Client.ExecuteWorkflow(ctx, opts, w.Name)
 }
-
-type Workflow0 struct {
-	Name  string
-	queue *Queue
-}
-
-func NewWorkflow0(queue *Queue, name string) Workflow0 {
-	queue.registerWorkflow(name, (func(context.Context) error)(nil))
-	return Workflow0{
-		Name:  name,
-		queue: queue,
-	}
-}
-
-func (w Workflow0) WithImplementation(fn func(workflow.Context) error) *WorkflowWithImpl {
-	return &WorkflowWithImpl{workflowName: w.Name, queue: *w.queue, fn: fn}
-}
-
-func (w Workflow0) Register(wr worker.WorkflowRegistry, fn func(workflow.Context) error) {
-	wr.RegisterWorkflowWithOptions(fn, workflow.RegisterOptions{
-		Name: w.Name,
-	})
-}
-
-func (w Workflow0) Run(ctx context.Context, temporalClient *Client, opts client.StartWorkflowOptions) error {
-	r, err := w.Execute(ctx, temporalClient, opts)
+func (w Workflow0R[Return]) RunChild(ctx workflow.Context, opts workflow.ChildWorkflowOptions) (Return, error) {
+	var o Return
+	err := w.ExecuteChild(ctx, opts).Get(ctx, &o)
 	if err != nil {
-		return err
+		return o, err
 	}
-	err = r.Get(ctx, nil)
-	return err
+	return o, nil
 }
 
-func (w Workflow0) Execute(ctx context.Context, temporalClient *Client, opts client.StartWorkflowOptions) (client.WorkflowRun, error) {
+func (w Workflow0R[Return]) ExecuteChild(ctx workflow.Context, opts workflow.ChildWorkflowOptions) workflow.ChildWorkflowFuture {
 	opts.TaskQueue = w.queue.name
-	if w.queue.namespace.name != temporalClient.namespace {
-		// The user must provide a client that's connected to the right namespace to be able to start this workflow.
-		return nil, fmt.Errorf("wrong namespace for client %s vs workflow %s", temporalClient.namespace, w.queue.namespace.name)
-	}
-	return temporalClient.Client.ExecuteWorkflow(ctx, opts, w.Name)
+	opts.Namespace = w.queue.namespace.name
+	return workflow.ExecuteChildWorkflow(workflow.WithChildOptions(ctx, opts), w.Name)
+}
+
+func (w Workflow0R[Return]) SetSchedule(ctx context.Context, temporalClient *Client, opts client.ScheduleOptions) error {
+	return setSchedule(ctx, temporalClient, opts, w.Name, w.queue, []any{})
 }
 
 type Workflow1[Param any] struct {
