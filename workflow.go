@@ -121,7 +121,7 @@ func NewWorkflow1R[
 	}
 }
 
-func (w Workflow1R[Param, Return]) WithImplementation(fn func(workflow.Context, Param) (Return, error)) Registerable {
+func (w Workflow1R[Param, Return]) WithImplementation(fn func(workflow.Context, Param) (Return, error)) *WorkflowWithImpl {
 	return &WorkflowWithImpl{workflowName: w.Name, queue: *w.queue, fn: fn}
 }
 
@@ -185,7 +185,7 @@ func NewWorkflow1[
 	}
 }
 
-func (w Workflow1[Param]) WithImplementation(fn func(workflow.Context, Param) error) Registerable {
+func (w Workflow1[Param]) WithImplementation(fn func(workflow.Context, Param) error) *WorkflowWithImpl {
 	return &WorkflowWithImpl{workflowName: w.Name, queue: *w.queue, fn: fn}
 }
 

@@ -75,11 +75,11 @@ func main() {
 	}
 	fmt.Printf("Name returned from the workflow: %s\n", newName)
 	err = workflowTypeFormatAndGreet.SetSchedule(ctx, c, client.ScheduleOptions{
-		ID: "minutely",
+		ID: "every5s",
 		Spec: client.ScheduleSpec{
 			Intervals: []client.ScheduleIntervalSpec{
 				{
-					Every: time.Minute,
+					Every: time.Second * 5,
 				},
 			},
 		},
@@ -87,7 +87,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	time.Sleep(time.Minute + time.Second*20)
+	time.Sleep(time.Second * 10)
 }
 
 func activityFormatName(ctx context.Context, input string) (string, error) {

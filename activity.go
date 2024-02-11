@@ -44,7 +44,7 @@ func NewActivity1[Param any](q *Queue, name string) Activity1[Param] {
 	return Activity1[Param]{Name: name, queue: q}
 }
 
-func (a Activity1[Param]) WithImplementation(fn func(context.Context, Param) error) Registerable {
+func (a Activity1[Param]) WithImplementation(fn func(context.Context, Param) error) *ActivityWithImpl {
 	return &ActivityWithImpl{activityName: a.Name, queue: a.queue, fn: fn}
 }
 
@@ -70,7 +70,7 @@ func NewActivity1R[Param, Return any](q *Queue, name string) Activity1R[Param, R
 	return Activity1R[Param, Return]{Name: name, queue: q}
 }
 
-func (a Activity1R[Param, Return]) WithImplementation(fn func(context.Context, Param) (Return, error)) Registerable {
+func (a Activity1R[Param, Return]) WithImplementation(fn func(context.Context, Param) (Return, error)) *ActivityWithImpl {
 	return &ActivityWithImpl{activityName: a.Name, queue: a.queue, fn: fn}
 }
 

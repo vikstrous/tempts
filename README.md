@@ -33,7 +33,9 @@ Queries and updates:
 * Return the right types
 * Registered functions match the right type signature
 
+Tools:
+* Plumbing for fixture based tests with namespace safety checks
+
 More guarantees coming soon:
 
-* Automatic fixture based tests
 * Signals type safety
