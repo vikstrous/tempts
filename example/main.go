@@ -33,6 +33,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	defer c.Close()
 	wrk, err := tstemporal.NewWorker(queueMain, []tstemporal.Registerable{
 		activityTypeFormatName.WithImplementation(activityFormatName),
 		activityTypeGreet.WithImplementation(activityGreet),
