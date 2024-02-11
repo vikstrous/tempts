@@ -17,6 +17,16 @@ import (
 	"go.temporal.io/sdk/workflow"
 )
 
+// Define a new namespace and task queue.
+var nsDefault = tstemporal.NewNamespace(client.DefaultNamespace)
+var queueMain = tstemporal.NewQueue(nsDefault, "main")
+
+// Define a workflow with no parameters and no return.
+var workflowTypeHello = tstemporal.NewWorkflow0(queueMain, "HelloWorkflow")
+
+// Define an activity with no parameters and no return.
+var activityTypeHello = tstemporal.NewActivity0(queueMain, "HelloActivity")
+
 func main() {
 	// Create a new client connected to the Temporal server.
 	c, err := tstemporal.Dial(client.Options{})
@@ -24,16 +34,6 @@ func main() {
 		panic(err)
 	}
 	defer c.Close()
-
-	// Define a new namespace and task queue.
-	nsDefault := tstemporal.NewNamespace(client.DefaultNamespace)
-	queueMain := tstemporal.NewQueue(nsDefault, "main")
-
-	// Define a workflow with no parameters and no return.
-	workflowTypeHello := tstemporal.NewWorkflow0(queueMain, "HelloWorkflow")
-
-	// Define an activity with no parameters and no return.
-	activityTypeHello := tstemporal.NewActivity0(queueMain, "HelloActivity")
 
 	// Register the workflow and activity in a new worker.
 	wrk, err := tstemporal.NewWorker(queueMain, []tstemporal.Registerable{
@@ -67,7 +67,7 @@ func helloWorkflow(ctx workflow.Context) error {
 	ctx = workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
 		StartToCloseTimeout: time.Second * 10,
 	})
-	err := workflow.ExecuteActivity(ctx, "HelloActivity").Get(ctx, nil)
+	err := activityTypeHello.Run(ctx)
 	return err
 }
 
