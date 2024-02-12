@@ -102,12 +102,12 @@ func (a Activity1[Param]) WithImplementation(fn func(context.Context, Param) err
 	return &ActivityWithImpl{activityName: a.Name, queue: a.queue, fn: fn}
 }
 
-func (a Activity1[Param]) Run(ctx workflow.Context, i1 Param) error {
-	return a.Execute(ctx, i1).Get(ctx, nil)
+func (a Activity1[Param]) Run(ctx workflow.Context, param Param) error {
+	return a.Execute(ctx, param).Get(ctx, nil)
 }
 
-func (a Activity1[Param]) Execute(ctx workflow.Context, i1 Param) workflow.Future {
-	return workflow.ExecuteActivity(workflow.WithWorkflowNamespace(workflow.WithTaskQueue(ctx, a.queue.name), a.queue.namespace.name), a.Name, i1)
+func (a Activity1[Param]) Execute(ctx workflow.Context, param Param) workflow.Future {
+	return workflow.ExecuteActivity(workflow.WithWorkflowNamespace(workflow.WithTaskQueue(ctx, a.queue.name), a.queue.namespace.name), a.Name, param)
 }
 
 func (a Activity1[Param]) Register(w worker.ActivityRegistry, fn func(context.Context, Param) error) {
@@ -128,14 +128,14 @@ func (a Activity1R[Param, Return]) WithImplementation(fn func(context.Context, P
 	return &ActivityWithImpl{activityName: a.Name, queue: a.queue, fn: fn}
 }
 
-func (a Activity1R[Param, Return]) Run(ctx workflow.Context, i1 Param) (Return, error) {
+func (a Activity1R[Param, Return]) Run(ctx workflow.Context, param Param) (Return, error) {
 	var ret Return
-	err := a.Execute(ctx, i1).Get(ctx, &ret)
+	err := a.Execute(ctx, param).Get(ctx, &ret)
 	return ret, err
 }
 
-func (a Activity1R[Param, Return]) Execute(ctx workflow.Context, i1 Param) workflow.Future {
-	return workflow.ExecuteActivity(workflow.WithWorkflowNamespace(workflow.WithTaskQueue(ctx, a.queue.name), a.queue.namespace.name), a.Name, i1)
+func (a Activity1R[Param, Return]) Execute(ctx workflow.Context, param Param) workflow.Future {
+	return workflow.ExecuteActivity(workflow.WithWorkflowNamespace(workflow.WithTaskQueue(ctx, a.queue.name), a.queue.namespace.name), a.Name, param)
 }
 
 func (a Activity1R[Param, Return]) Register(w worker.ActivityRegistry, fn func(context.Context, Param) (Return, error)) {

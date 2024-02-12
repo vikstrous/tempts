@@ -332,12 +332,12 @@ func (w Workflow1R[Param, Return]) Execute(ctx context.Context, temporalClient *
 }
 
 func (w Workflow1R[Param, Return]) RunChild(ctx workflow.Context, opts workflow.ChildWorkflowOptions, param Param) (Return, error) {
-	var o Return
-	err := w.ExecuteChild(ctx, opts, param).Get(ctx, &o)
+	var ret Return
+	err := w.ExecuteChild(ctx, opts, param).Get(ctx, &ret)
 	if err != nil {
-		return o, err
+		return ret, err
 	}
-	return o, nil
+	return ret, nil
 }
 
 func (w Workflow1R[Param, Return]) ExecuteChild(ctx workflow.Context, opts workflow.ChildWorkflowOptions, param Param) workflow.ChildWorkflowFuture {
