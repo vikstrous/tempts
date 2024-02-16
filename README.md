@@ -11,6 +11,8 @@ package main
 import (
 	"context"
 	"fmt"
+	"time"
+
 	"github.com/vikstrous/tstemporal"
 	"go.temporal.io/sdk/client"
 	"go.temporal.io/sdk/worker"
@@ -22,10 +24,10 @@ var nsDefault = tstemporal.NewNamespace(client.DefaultNamespace)
 var queueMain = tstemporal.NewQueue(nsDefault, "main")
 
 // Define a workflow with no parameters and no return.
-var workflowTypeHello = tstemporal.NewWorkflow0(queueMain, "HelloWorkflow")
+var workflowTypeHello = tstemporal.NewWorkflow[struct{}, struct{}](queueMain, "HelloWorkflow")
 
 // Define an activity with no parameters and no return.
-var activityTypeHello = tstemporal.NewActivity0(queueMain, "HelloActivity")
+var activityTypeHello = tstemporal.NewActivity[struct{}, struct{}](queueMain, "HelloActivity")
 
 func main() {
 	// Create a new client connected to the Temporal server.
@@ -54,7 +56,7 @@ func main() {
 	}()
 
 	// Execute the workflow and wait for it to complete.
-	err = workflowTypeHello.Run(ctx, c, client.StartWorkflowOptions{})
+	_, err = workflowTypeHello.Run(ctx, c, client.StartWorkflowOptions{}, struct{}{})
 	if err != nil {
 		panic(err)
 	}
@@ -63,18 +65,17 @@ func main() {
 }
 
 // helloWorkflow is a workflow function that calls the HelloActivity.
-func helloWorkflow(ctx workflow.Context) error {
+func helloWorkflow(ctx workflow.Context, _ struct{}) (struct{}, error) {
 	ctx = workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
 		StartToCloseTimeout: time.Second * 10,
 	})
-	err := activityTypeHello.Run(ctx)
-	return err
+	return activityTypeHello.Run(ctx, struct{}{})
 }
 
 // helloActivity is an activity function that prints "Hello, Temporal!".
-func helloActivity(ctx context.Context) error {
+func helloActivity(ctx context.Context, _ struct{}) (struct{}, error) {
 	fmt.Println("Hello, Temporal!")
-	return nil
+	return struct{}{}, nil
 }
 
 ```

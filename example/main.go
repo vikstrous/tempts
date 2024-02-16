@@ -17,15 +17,15 @@ var nsDefault = tstemporal.NewNamespace(client.DefaultNamespace)
 var queueMain = tstemporal.NewQueue(nsDefault, "main")
 
 var (
-	workflowTypeFormatAndGreet        = tstemporal.NewWorkflow1R[string, string](queueMain, "format_and_greet")
-	workflowTypeFormatAndGreetGetName = tstemporal.NewQueryHandler0[string]("get_formatted_name")
-	workflowTypeFormatAndGreetSetName = tstemporal.NewUpdateHandler1R[string, string]("set_formatted_name")
-	activityTypeFormatName            = tstemporal.NewActivity1R[string, string](queueMain, "format_name")
+	workflowTypeFormatAndGreet        = tstemporal.NewWorkflow[string, string](queueMain, "format_and_greet")
+	workflowTypeFormatAndGreetGetName = tstemporal.NewQueryHandler[struct{}, string]("get_formatted_name")
+	workflowTypeFormatAndGreetSetName = tstemporal.NewUpdateHandler[string, string]("set_formatted_name")
+	activityTypeFormatName            = tstemporal.NewActivity[string, string](queueMain, "format_name")
 )
 
 var (
-	workflowTypeJustGreet = tstemporal.NewWorkflow1[string](queueMain, "greet")
-	activityTypeGreet     = tstemporal.NewActivity1[string](queueMain, "greet")
+	workflowTypeJustGreet = tstemporal.NewWorkflow[string, struct{}](queueMain, "greet")
+	activityTypeGreet     = tstemporal.NewActivity[string, struct{}](queueMain, "greet")
 )
 
 func main() {
@@ -56,7 +56,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	newName, err := workflowTypeFormatAndGreetGetName.Query(ctx, c, workflowHandle.GetID(), workflowHandle.GetRunID())
+	newName, err := workflowTypeFormatAndGreetGetName.Query(ctx, c, workflowHandle.GetID(), workflowHandle.GetRunID(), struct{}{})
 	if err != nil {
 		panic(err)
 	}
@@ -100,7 +100,7 @@ func workflowFormatAndGreet(ctx workflow.Context, name string) (string, error) {
 	ctx = workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
 		StartToCloseTimeout: time.Second * 10,
 	})
-	workflowTypeFormatAndGreetGetName.SetHandler(ctx, func() (string, error) {
+	workflowTypeFormatAndGreetGetName.SetHandler(ctx, func(struct{}) (string, error) {
 		return newName, nil
 	})
 	workflowTypeFormatAndGreetSetName.SetHandler(ctx, func(ctx workflow.Context, p string) (string, error) {
@@ -118,21 +118,21 @@ func workflowFormatAndGreet(ctx workflow.Context, name string) (string, error) {
 	// Give the caller a chance to do an update
 	workflow.Sleep(ctx, time.Second*1)
 
-	err = workflowTypeJustGreet.RunChild(ctx, workflow.ChildWorkflowOptions{}, newName)
+	_, err = workflowTypeJustGreet.RunChild(ctx, workflow.ChildWorkflowOptions{}, newName)
 	if err != nil {
 		return "", err
 	}
 	return newName, nil
 }
 
-func workflowJustGreet(ctx workflow.Context, name string) error {
+func workflowJustGreet(ctx workflow.Context, name string) (struct{}, error) {
 	ctx = workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
 		StartToCloseTimeout: time.Second * 10,
 	})
 	return activityTypeGreet.Run(ctx, name)
 }
 
-func activityGreet(ctx context.Context, name string) error {
+func activityGreet(ctx context.Context, name string) (struct{}, error) {
 	fmt.Printf("Hello %s\n", name)
-	return nil
+	return struct{}{}, nil
 }
