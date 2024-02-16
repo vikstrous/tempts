@@ -131,3 +131,123 @@ See `example/main_test.go` for an example of how to use them.
 func GetWorkflowHistoriesBundle(ctx context.Context, client *tstemporal.Client, w *tstemporal.WorkflowWithImpl) ([]byte, error)
 func ReplayWorkflow(historiesBytes []byte, w *tstemporal.WorkflowWithImpl) error
 ```
+
+## User guide by example
+
+These examples assume that you are already familiar with the Go SDK and just need to know how to do the equivalent thing using this library.
+
+### Connect
+
+Instead of:
+```go
+c, err := tstemporal.Dial(client.Options{})
+```
+Do:
+```go
+c, err := client.Dial(client.Options{})
+```
+This creates a wrapper that keeps track of which namespace the client is connected to so that actions are attempted against the wrong namespace, such as starting the wrong workflow, can be caught early.
+
+### Run a workflow to completion
+
+Instead of:
+```go
+var ret ReturnType
+c.ExecuteWorkflow(ctx, opts, name, param).Get(ctx, &ret)
+```
+Do:
+```go
+// Globally define the namespace, queue and workflow type (one time, in a centralized package for the queue)
+var nsDefault = tstemporal.NewNamespace(client.DefaultNamespace)
+var queueMain = tstemporal.NewQueue(nsDefault, "main")
+type exampleWorkflowParamType struct{
+	Param string
+}
+type exampleWorkflowReturnType struct{
+	Return string
+}
+var exampleWorkflowType = tstemporal.NewWorkflow[exampleWorkflowParamType, exampleWorkflowReturnType](queueMain, "ExampleWorkflow")
+
+// Run and get the result of the workflow
+ret, err := exampleWorkflowType.Run(ctx, c, opts, param)
+// Use Execute instead of Run to not wait for completion
+```
+This ensures that the workflow is run in the right namespace, on the right queue, with the right name, with the right parameter types and it returns the right type.
+
+### Run an activity to completion
+
+Instead of:
+```go
+var ret ReturnType
+workflow.ExecuteActivity(ctx, name, param).Get(ctx, &ret)
+```
+Do:
+```go
+// Globally define the namespace, queue and activity type (one time, in a centralized package for the queue)
+var nsDefault = tstemporal.NewNamespace(client.DefaultNamespace)
+var queueMain = tstemporal.NewQueue(nsDefault, "main")
+type exampleActivityParamType struct{
+	Param string
+}
+type exampleActivityReturnType struct{
+	Return string
+}
+var exampleActivityType = tstemporal.NewActivity[exampleActivityParamType, exampleActivityReturnType](queueMain, "ExampleActivity")
+
+// Run and get the result of the activity from a workflow
+ret, err := exampleActivityType.Run(ctx, param)
+// Use Execute instead of Run to not wait for completion
+```
+
+This ensures that the activity is run in the right namespace, on the right queue, with the right name, with the right parameter types and it returns the right type.
+
+### Create a worker
+
+Instead of:
+```go
+wrk := worker.New(c, queueName, options)
+err = wrk.Run(worker.InterruptCh())
+```
+Do:
+```go
+// Globally define the namespace and queue (one time, in a centralized package for the queue)
+var nsDefault = tstemporal.NewNamespace(client.DefaultNamespace)
+var queueMain = tstemporal.NewQueue(nsDefault, "main")
+
+// On start up of your service
+wrk, err := tstemporal.NewWorker(queueMain, []tstemporal.Registerable{
+	exampleWorkflowType.WithImplementation(exampleWorkflow),
+	exampleActivityType.WithImplementation(exampleActivity),
+})
+
+err = wrk.Run(ctx, c, worker.Options{})
+```
+This ensures that all the right workflows and activities are registered for this worker to satisfy the expectations for this queue. No more and no less.
+
+### Query a workflow
+
+TODO
+
+### Create a schedule
+
+TODO
+
+### Fixture based tests
+
+TODO
+
+## Migration
+
+Since this library is opinionated, it doesn't support all temporal features. To use this library effectively, the temporal queue you are migrating must meet these pre-requisities:
+* All workflows must take at most one parameter and return at most one parameter.
+* All activities must take at most one parameter and return at most one parameter.
+* Namespaces names and queues names must be static (assuming that your types are defined as global variables so they can be used anywhere).
+* All workflows and activities for the queue must be known.
+* All types must be defined as Go structs that follow the Temporal Go SDK's marshaling and unmarshaling logic.
+
+There maybe more restrictions that I'm not aware of yet. Open an issue if any are missed.
+
+## Potential future improvements
+
+* Wrap the APIs for channels and signals
+* Return typed futures instead of generic ones
