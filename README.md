@@ -1,7 +1,15 @@
 # tstemporal
 Type-safe Temporal Go SDK wrapper
 
+[![Go Reference](https://pkg.go.dev/badge/github.com/vikstrous/tstemporal.svg)](https://pkg.go.dev/github.com/vikstrous/tstemporal)
+
+
 ## Example Usage
+
+Add this dependency with
+```
+go get github.com/vikstrous/tstemporal@latest
+```
 
 Below is a simple example demonstrating how to define a workflow and an activity, register them, and execute the workflow using `tstemporal`.
 
@@ -117,7 +125,3 @@ Queries and updates:
 
 Tools:
 * Plumbing for fixture based tests with namespace safety checks
-
-More guarantees coming soon:
-
-* Signals type safety
