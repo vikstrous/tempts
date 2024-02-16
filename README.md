@@ -123,5 +123,11 @@ Queries and updates:
 * Return the right types
 * Registered functions match the right type signature
 
-Tools:
-* Plumbing for fixture based tests with namespace safety checks
+### Tools
+
+There are two functions in this library that make it easy to write fixture based replyabaility tests for your tstemporal workflows and activities.
+See `example/main_test.go` for an example of how to use them.
+```go
+func GetWorkflowHistoriesBundle(ctx context.Context, client *tstemporal.Client, w *tstemporal.WorkflowWithImpl) ([]byte, error)
+func ReplayWorkflow(historiesBytes []byte, w *tstemporal.WorkflowWithImpl) error
+```
