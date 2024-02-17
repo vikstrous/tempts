@@ -116,7 +116,7 @@ Workflows:
 
 Schedules:
 
-* Set the right workflow argument types
+* Set arguments with the right types
 * Can be "set" on start up of the application and the intended effect will be applied to the state of the schedule on the cluster automatically
 
 Queries and updates:
