@@ -1,4 +1,4 @@
-# tstemporal
+g tstemporal
 Type-safe Temporal Go SDK wrapper
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/vikstrous/tstemporal.svg)](https://pkg.go.dev/github.com/vikstrous/tstemporal)
@@ -117,7 +117,7 @@ Workflows:
 Schedules:
 
 * Set arguments with the right types
-* Can be 'set' upon application startup, automatically applying the intended effect to the schedule's state on the cluster
+* Can be set upon application startup, automatically applying the intended effect to the schedule's state on the cluster
 
 Queries and updates:
 
