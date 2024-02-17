@@ -1,6 +1,6 @@
 module github.com/vikstrous/tstemporal
 
-go 1.21.5
+go 1.22.0
 
 require (
 	github.com/gogo/protobuf v1.3.2
