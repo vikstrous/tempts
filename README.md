@@ -321,7 +321,7 @@ if err != nil {
 
 This is really just the cherry on top once you have your type safety in place. By running fixture based tests, you can make sure to not introduce backwards incompatible changes without versioning them correctly. Even if you don't end up using this package, feel free to adapt this pattern for your own needs. It's not a lot of code for how much extra safety it provides.
 
-## Migration
+## Migration for Go SDK users
 
 Since this library is opinionated, it doesn't support all temporal features. To use this library effectively, the temporal queue you are migrating must meet these pre-requisities:
 * All workflows must take at most one parameter and return at most one parameter.
