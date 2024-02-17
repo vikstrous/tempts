@@ -17,14 +17,14 @@ Below is a simple example demonstrating how to define a workflow and an activity
 package main
 
 import (
-	"context"
-	"fmt"
-	"time"
+    "context"
+    "fmt"
+    "time"
 
-	"github.com/vikstrous/tstemporal"
-	"go.temporal.io/sdk/client"
-	"go.temporal.io/sdk/worker"
-	"go.temporal.io/sdk/workflow"
+    "github.com/vikstrous/tstemporal"
+    "go.temporal.io/sdk/client"
+    "go.temporal.io/sdk/worker"
+    "go.temporal.io/sdk/workflow"
 )
 
 // Define a new namespace and task queue.
@@ -38,52 +38,52 @@ var workflowTypeHello = tstemporal.NewWorkflow[struct{}, struct{}](queueMain, "H
 var activityTypeHello = tstemporal.NewActivity[struct{}, struct{}](queueMain, "HelloActivity")
 
 func main() {
-	// Create a new client connected to the Temporal server.
-	c, err := tstemporal.Dial(client.Options{})
-	if err != nil {
-		panic(err)
-	}
-	defer c.Close()
+    // Create a new client connected to the Temporal server.
+    c, err := tstemporal.Dial(client.Options{})
+    if err != nil {
+        panic(err)
+    }
+    defer c.Close()
 
-	// Register the workflow and activity in a new worker.
-	wrk, err := tstemporal.NewWorker(queueMain, []tstemporal.Registerable{
-		workflowTypeHello.WithImplementation(helloWorkflow),
-		activityTypeHello.WithImplementation(helloActivity),
-	})
-	if err != nil {
-		panic(err)
-	}
-	ctx := context.Background()
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	go func() {
-		err = wrk.Run(ctx, c, worker.Options{})
-		if err != nil {
-			panic(err)
-		}
-	}()
+    // Register the workflow and activity in a new worker.
+    wrk, err := tstemporal.NewWorker(queueMain, []tstemporal.Registerable{
+        workflowTypeHello.WithImplementation(helloWorkflow),
+        activityTypeHello.WithImplementation(helloActivity),
+    })
+    if err != nil {
+        panic(err)
+    }
+    ctx := context.Background()
+    ctx, cancel := context.WithCancel(ctx)
+    defer cancel()
+    go func() {
+        err = wrk.Run(ctx, c, worker.Options{})
+        if err != nil {
+            panic(err)
+        }
+    }()
 
-	// Execute the workflow and wait for it to complete.
-	_, err = workflowTypeHello.Run(ctx, c, client.StartWorkflowOptions{}, struct{}{})
-	if err != nil {
-		panic(err)
-	}
+    // Execute the workflow and wait for it to complete.
+    _, err = workflowTypeHello.Run(ctx, c, client.StartWorkflowOptions{}, struct{}{})
+    if err != nil {
+        panic(err)
+    }
 
-	fmt.Println("Workflow completed.")
+    fmt.Println("Workflow completed.")
 }
 
 // helloWorkflow is a workflow function that calls the HelloActivity.
 func helloWorkflow(ctx workflow.Context, _ struct{}) (struct{}, error) {
-	ctx = workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
-		StartToCloseTimeout: time.Second * 10,
-	})
-	return activityTypeHello.Run(ctx, struct{}{})
+    ctx = workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
+        StartToCloseTimeout: time.Second * 10,
+    })
+    return activityTypeHello.Run(ctx, struct{}{})
 }
 
 // helloActivity is an activity function that prints "Hello, Temporal!".
 func helloActivity(ctx context.Context, _ struct{}) (struct{}, error) {
-	fmt.Println("Hello, Temporal!")
-	return struct{}{}, nil
+    fmt.Println("Hello, Temporal!")
+    return struct{}{}, nil
 }
 
 ```
@@ -163,10 +163,10 @@ Do:
 var nsDefault = tstemporal.NewNamespace(client.DefaultNamespace)
 var queueMain = tstemporal.NewQueue(nsDefault, "main")
 type exampleWorkflowParamType struct{
-	Param string
+    Param string
 }
 type exampleWorkflowReturnType struct{
-	Return string
+    Return string
 }
 var exampleWorkflowType = tstemporal.NewWorkflow[exampleWorkflowParamType, exampleWorkflowReturnType](queueMain, "ExampleWorkflow")
 
@@ -189,10 +189,10 @@ Do:
 var nsDefault = tstemporal.NewNamespace(client.DefaultNamespace)
 var queueMain = tstemporal.NewQueue(nsDefault, "main")
 type exampleActivityParamType struct{
-	Param string
+    Param string
 }
 type exampleActivityReturnType struct{
-	Return string
+    Return string
 }
 var exampleActivityType = tstemporal.NewActivity[exampleActivityParamType, exampleActivityReturnType](queueMain, "ExampleActivity")
 
@@ -218,8 +218,8 @@ var queueMain = tstemporal.NewQueue(nsDefault, "main")
 
 // On start up of your service
 wrk, err := tstemporal.NewWorker(queueMain, []tstemporal.Registerable{
-	exampleWorkflowType.WithImplementation(exampleWorkflow),
-	exampleActivityType.WithImplementation(exampleActivity),
+    exampleWorkflowType.WithImplementation(exampleWorkflow),
+    exampleActivityType.WithImplementation(exampleActivity),
 })
 
 err = wrk.Run(ctx, c, worker.Options{})
@@ -232,7 +232,7 @@ Instead of:
 ```go
 // In the workflow
 workflow.SetQueryHandler(ctx, queryName, func(queryParamType) (queryReturnType, error) {
-	return queryReturnType{}, nil
+    return queryReturnType{}, nil
 })
 
 // Querying it from your application
@@ -248,7 +248,7 @@ var exampleQueryType = tstemporal.NewQueryHandler[queryParamType, queryReturnTyp
 
 // In the workflow
 exampleQueryType.SetHandler(ctx, func(queryParamType) (queryReturnType, error) {
-	return queryReturnType{}, nil
+    return queryReturnType{}, nil
 })
 
 // Query it from your application
@@ -262,20 +262,20 @@ This ensures that the types match in the application calling the workflow and in
 Instead of:
 ```go
 _, err = c.ScheduleClient().Create(ctx, client.ScheduleOptions{
-	ID:   scheduleID,
-	Spec: client.ScheduleSpec{
-		Intervals: []client.ScheduleIntervalSpec{
-			{
-				Every: time.Second * 5,
-			},
-		},
-	},
-	Action: &client.ScheduleWorkflowAction{
-		ID:        workflowID,
-		Workflow:  workflowName,
-		TaskQueue: queueName,
-		Args:      []any{param},
-	},
+    ID:   scheduleID,
+    Spec: client.ScheduleSpec{
+        Intervals: []client.ScheduleIntervalSpec{
+            {
+                Every: time.Second * 5,
+            },
+        },
+    },
+    Action: &client.ScheduleWorkflowAction{
+        ID:        workflowID,
+        Workflow:  workflowName,
+        TaskQueue: queueName,
+        Args:      []any{param},
+    },
 })
 // Ignore the error if it exists already
 ```
@@ -285,14 +285,14 @@ Do:
 
 // Call this to make sure the schedule matches what your service expects
 err = workflowTypeFormatAndGreet.SetSchedule(ctx, c, client.ScheduleOptions{
-	ID: scheduleID,
-	Spec: client.ScheduleSpec{
-		Intervals: []client.ScheduleIntervalSpec{
-			{
-				Every: time.Second * 5,
-			},
-		},
-	},
+    ID: scheduleID,
+    Spec: client.ScheduleSpec{
+        Intervals: []client.ScheduleIntervalSpec{
+            {
+                Every: time.Second * 5,
+            },
+        },
+    },
 }, param)
 ```
 
@@ -305,17 +305,17 @@ Do:
 ```go
 c, err := tstemporal.Dial(client.Options{})
 if err != nil {
-	t.Fatal(err)
+    t.Fatal(err)
 }
 workflowImpl := exampleWorkflowType.WithImplementation(exampleWorkflow)
 historiesData, err = tstemporal.GetWorkflowHistoriesBundle(ctx, c, workflowImpl)
 if err != nil {
-	t.Fatal(err)
+    t.Fatal(err)
 }
 // Now store historiesData somewhere! (Or don't and make sure your test is always connected to a temporal instance with example workflow runs)
 err := tstemporal.ReplayWorkflow(historiesData, workflowImpl)
 if err != nil {
-	t.Fatal(err)
+    t.Fatal(err)
 }
 ```
 
