@@ -90,6 +90,8 @@ func helloActivity(ctx context.Context, _ struct{}) (struct{}, error) {
 
 This example sets up a workflow and an activity that simply prints a greeting. It demonstrates the basic setup and execution flow using `tstemporal`. To see a more complex example, look in the example directory.
 
+**WARNING: This library can change without notice while I respond to feedback and improve the API. I'll remove this warning when I'm happy with the API and can promise it won't change.**
+
 ## Guarantees
 
 List of guarantees provided by this wrapper:
@@ -136,7 +138,7 @@ func ReplayWorkflow(historiesBytes []byte, w *tstemporal.WorkflowWithImpl) error
 
 These examples assume that you are already familiar with the Go SDK and just need to know how to do the equivalent thing using this library.
 
-### Connect
+### Connect to temporal
 
 Instead of:
 ```go
@@ -226,15 +228,98 @@ This ensures that all the right workflows and activities are registered for this
 
 ### Query a workflow
 
-TODO
+Instead of:
+```go
+// In the workflow
+workflow.SetQueryHandler(ctx, queryName, func(queryParamType) (queryReturnType, error) {
+	return queryReturnType{}, nil
+})
+
+// Querying it from your application
+response, err := c.QueryWorkflow(ctx, workflowID, runID, queryName, param)
+
+var value Return
+err = response.Get(&value)
+```
+Do:
+```go
+// Globally define the query type
+var exampleQueryType = tstemporal.NewQueryHandler[queryParamType, queryReturnType]("exampleQuery")
+
+// In the workflow
+exampleQueryType.SetHandler(ctx, func(queryParamType) (queryReturnType, error) {
+	return queryReturnType{}, nil
+})
+
+// Query it from your application
+ret, err := exampleQueryType.Query(ctx, c, workflowID, runID, param)
+```
+
+This ensures that the types match in the application calling the workflow and in the workflow handler function. Unfortunately, we don't guarantee that the workflow is the expected type.
 
 ### Create a schedule
 
-TODO
+Instead of:
+```go
+_, err = c.ScheduleClient().Create(ctx, client.ScheduleOptions{
+	ID:   scheduleID,
+	Spec: client.ScheduleSpec{
+		Intervals: []client.ScheduleIntervalSpec{
+			{
+				Every: time.Second * 5,
+			},
+		},
+	},
+	Action: &client.ScheduleWorkflowAction{
+		ID:        workflowID,
+		Workflow:  workflowName,
+		TaskQueue: queueName,
+		Args:      []any{param},
+	},
+})
+// Ignore the error if it exists already
+```
+Do:
+```go
+// This assumes the workflow is already globally registered
+
+// Call this to make sure the schedule matches what your service expects
+err = workflowTypeFormatAndGreet.SetSchedule(ctx, c, client.ScheduleOptions{
+	ID: scheduleID,
+	Spec: client.ScheduleSpec{
+		Intervals: []client.ScheduleIntervalSpec{
+			{
+				Every: time.Second * 5,
+			},
+		},
+	},
+}, param)
+```
+
+This ensures that the namespace and queue are correct for the workflow. It also ensures that the parameter is the right type and that the schedule is updated to match the one defined in your code. It doesn't handle every possible difference yet because temporal doesn't support arbitrary changes to schedules. This feature is a bit less polished than the rest of the package, so let me know how to improve it!
 
 ### Fixture based tests
 
-TODO
+Instead of: coming up with your own strategy to build fixture based tests
+Do:
+```go
+c, err := tstemporal.Dial(client.Options{})
+if err != nil {
+	t.Fatal(err)
+}
+workflowImpl := exampleWorkflowType.WithImplementation(exampleWorkflow)
+historiesData, err = tstemporal.GetWorkflowHistoriesBundle(ctx, c, workflowImpl)
+if err != nil {
+	t.Fatal(err)
+}
+// Now store historiesData somewhere! (Or don't and make sure your test is always connected to a temporal instance with example workflow runs)
+err := tstemporal.ReplayWorkflow(historiesData, workflowImpl)
+if err != nil {
+	t.Fatal(err)
+}
+```
+
+This is really just the cherry on top once you have your type safety in place. By running fixture based tests, you can make sure to not introduce backwards incompatible changes without versioning them correctly. Even if you don't end up using this package, feel free to adapt this pattern for your own needs. It's not a lot of code for how much extra safety it provides.
 
 ## Migration
 
@@ -251,3 +336,4 @@ There maybe more restrictions that I'm not aware of yet. Open an issue if any ar
 
 * Wrap the APIs for channels and signals
 * Return typed futures instead of generic ones
+* Ensure that all queries are defined on the right workflows
