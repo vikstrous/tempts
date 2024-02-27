@@ -1,4 +1,4 @@
-g tstemporal
+# tstemporal
 Type-safe Temporal Go SDK wrapper
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/vikstrous/tstemporal.svg)](https://pkg.go.dev/github.com/vikstrous/tstemporal)
