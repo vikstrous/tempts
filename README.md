@@ -1,5 +1,5 @@
 # tempts
-Type-safe Temporal Go SDK wrapper
+`tempts` stands for "Temporal Type-Safe", a Go SDK wrapper for interacting with temporal more safely.
 
 [![Go Reference](https://pkg.go.dev/badge/github.com/vikstrous/tempts.svg)](https://pkg.go.dev/github.com/vikstrous/tempts)
 
