@@ -6,35 +6,35 @@ import (
 	"strings"
 	"time"
 
-	"github.com/vikstrous/tstemporal"
+	"github.com/vikstrous/tempts"
 	"go.temporal.io/sdk/client"
 	"go.temporal.io/sdk/worker"
 	"go.temporal.io/sdk/workflow"
 )
 
-var nsDefault = tstemporal.NewNamespace(client.DefaultNamespace)
+var nsDefault = tempts.NewNamespace(client.DefaultNamespace)
 
-var queueMain = tstemporal.NewQueue(nsDefault, "main")
+var queueMain = tempts.NewQueue(nsDefault, "main")
 
 var (
-	workflowTypeFormatAndGreet        = tstemporal.NewWorkflow[string, string](queueMain, "format_and_greet")
-	workflowTypeFormatAndGreetGetName = tstemporal.NewQueryHandler[struct{}, string]("get_formatted_name")
-	workflowTypeFormatAndGreetSetName = tstemporal.NewUpdateHandler[string, string]("set_formatted_name")
-	activityTypeFormatName            = tstemporal.NewActivity[string, string](queueMain, "format_name")
+	workflowTypeFormatAndGreet        = tempts.NewWorkflow[string, string](queueMain, "format_and_greet")
+	workflowTypeFormatAndGreetGetName = tempts.NewQueryHandler[struct{}, string]("get_formatted_name")
+	workflowTypeFormatAndGreetSetName = tempts.NewUpdateHandler[string, string]("set_formatted_name")
+	activityTypeFormatName            = tempts.NewActivity[string, string](queueMain, "format_name")
 )
 
 var (
-	workflowTypeJustGreet = tstemporal.NewWorkflow[string, struct{}](queueMain, "greet")
-	activityTypeGreet     = tstemporal.NewActivity[string, struct{}](queueMain, "greet")
+	workflowTypeJustGreet = tempts.NewWorkflow[string, struct{}](queueMain, "greet")
+	activityTypeGreet     = tempts.NewActivity[string, struct{}](queueMain, "greet")
 )
 
 func main() {
-	c, err := tstemporal.Dial(client.Options{})
+	c, err := tempts.Dial(client.Options{})
 	if err != nil {
 		panic(err)
 	}
 	defer c.Close()
-	wrk, err := tstemporal.NewWorker(queueMain, []tstemporal.Registerable{
+	wrk, err := tempts.NewWorker(queueMain, []tempts.Registerable{
 		activityTypeFormatName.WithImplementation(activityFormatName),
 		activityTypeGreet.WithImplementation(activityGreet),
 		workflowTypeFormatAndGreet.WithImplementation(workflowFormatAndGreet),

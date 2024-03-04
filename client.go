@@ -1,4 +1,4 @@
-package tstemporal
+package tempts
 
 import "go.temporal.io/sdk/client"
 

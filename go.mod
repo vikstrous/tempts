@@ -1,4 +1,4 @@
-module github.com/vikstrous/tstemporal
+module github.com/vikstrous/tempts
 
 go 1.22.0
 

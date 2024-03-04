@@ -8,14 +8,14 @@ import (
 	"os"
 	"testing"
 
-	"github.com/vikstrous/tstemporal"
+	"github.com/vikstrous/tempts"
 	"go.temporal.io/sdk/client"
 )
 
 var record bool
 
 func init() {
-	flag.BoolVar(&record, "tstemporal.record", false, "set this to update temporal history fixtures")
+	flag.BoolVar(&record, "tempts.record", false, "set this to update temporal history fixtures")
 }
 
 func TestFormatAndGreetReplayability(t *testing.T) {
@@ -25,15 +25,15 @@ func TestFormatAndGreetReplayability(t *testing.T) {
 	testReplayability(t, workflowImpl, filename)
 }
 
-func testReplayability(t *testing.T, workflowImpl *tstemporal.WorkflowWithImpl, filename string) {
+func testReplayability(t *testing.T, workflowImpl *tempts.WorkflowWithImpl, filename string) {
 	var historiesData []byte
 	if record {
 		ctx := context.Background()
-		c, err := tstemporal.Dial(client.Options{})
+		c, err := tempts.Dial(client.Options{})
 		if err != nil {
 			t.Fatal(err)
 		}
-		historiesData, err = tstemporal.GetWorkflowHistoriesBundle(ctx, c, workflowImpl)
+		historiesData, err = tempts.GetWorkflowHistoriesBundle(ctx, c, workflowImpl)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -50,7 +50,7 @@ func testReplayability(t *testing.T, workflowImpl *tstemporal.WorkflowWithImpl, 
 		}
 	}
 
-	err := tstemporal.ReplayWorkflow(historiesData, workflowImpl)
+	err := tempts.ReplayWorkflow(historiesData, workflowImpl)
 	if err != nil {
 		t.Fatal(err)
 	}

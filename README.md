@@ -1,17 +1,17 @@
-# tstemporal
+# tempts
 Type-safe Temporal Go SDK wrapper
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/vikstrous/tstemporal.svg)](https://pkg.go.dev/github.com/vikstrous/tstemporal)
+[![Go Reference](https://pkg.go.dev/badge/github.com/vikstrous/tempts.svg)](https://pkg.go.dev/github.com/vikstrous/tempts)
 
 
 ## Example Usage
 
 Add this dependency with
 ```
-go get github.com/vikstrous/tstemporal@latest
+go get github.com/vikstrous/tempts@latest
 ```
 
-Below is a simple example demonstrating how to define a workflow and an activity, register them, and execute the workflow using `tstemporal`.
+Below is a simple example demonstrating how to define a workflow and an activity, register them, and execute the workflow using `tempts`.
 
 ```go
 package main
@@ -21,32 +21,32 @@ import (
     "fmt"
     "time"
 
-    "github.com/vikstrous/tstemporal"
+    "github.com/vikstrous/tempts"
     "go.temporal.io/sdk/client"
     "go.temporal.io/sdk/worker"
     "go.temporal.io/sdk/workflow"
 )
 
 // Define a new namespace and task queue.
-var nsDefault = tstemporal.NewNamespace(client.DefaultNamespace)
-var queueMain = tstemporal.NewQueue(nsDefault, "main")
+var nsDefault = tempts.NewNamespace(client.DefaultNamespace)
+var queueMain = tempts.NewQueue(nsDefault, "main")
 
 // Define a workflow with no parameters and no return.
-var workflowTypeHello = tstemporal.NewWorkflow[struct{}, struct{}](queueMain, "HelloWorkflow")
+var workflowTypeHello = tempts.NewWorkflow[struct{}, struct{}](queueMain, "HelloWorkflow")
 
 // Define an activity with no parameters and no return.
-var activityTypeHello = tstemporal.NewActivity[struct{}, struct{}](queueMain, "HelloActivity")
+var activityTypeHello = tempts.NewActivity[struct{}, struct{}](queueMain, "HelloActivity")
 
 func main() {
     // Create a new client connected to the Temporal server.
-    c, err := tstemporal.Dial(client.Options{})
+    c, err := tempts.Dial(client.Options{})
     if err != nil {
         panic(err)
     }
     defer c.Close()
 
     // Register the workflow and activity in a new worker.
-    wrk, err := tstemporal.NewWorker(queueMain, []tstemporal.Registerable{
+    wrk, err := tempts.NewWorker(queueMain, []tempts.Registerable{
         workflowTypeHello.WithImplementation(helloWorkflow),
         activityTypeHello.WithImplementation(helloActivity),
     })
@@ -88,7 +88,7 @@ func helloActivity(ctx context.Context, _ struct{}) (struct{}, error) {
 
 ```
 
-This example sets up a workflow and an activity that simply prints a greeting. It demonstrates the basic setup and execution flow using `tstemporal`. To see a more complex example, look in the example directory.
+This example sets up a workflow and an activity that simply prints a greeting. It demonstrates the basic setup and execution flow using `tempts`. To see a more complex example, look in the example directory.
 
 **WARNING: This library can change without notice while I respond to feedback and improve the API. I'll remove this warning when I'm happy with the API and can promise it won't change.**
 
@@ -127,11 +127,11 @@ Queries and updates:
 
 ### Tools
 
-There are two functions in this library that make it easy to write fixture based replyabaility tests for your tstemporal workflows and activities.
+There are two functions in this library that make it easy to write fixture based replyabaility tests for your tempts workflows and activities.
 See `example/main_test.go` for an example of how to use them.
 ```go
-func GetWorkflowHistoriesBundle(ctx context.Context, client *tstemporal.Client, w *tstemporal.WorkflowWithImpl) ([]byte, error)
-func ReplayWorkflow(historiesBytes []byte, w *tstemporal.WorkflowWithImpl) error
+func GetWorkflowHistoriesBundle(ctx context.Context, client *tempts.Client, w *tempts.WorkflowWithImpl) ([]byte, error)
+func ReplayWorkflow(historiesBytes []byte, w *tempts.WorkflowWithImpl) error
 ```
 
 ## User guide by example
@@ -142,7 +142,7 @@ These examples assume that you are already familiar with the Go SDK and just nee
 
 Instead of:
 ```go
-c, err := tstemporal.Dial(client.Options{})
+c, err := tempts.Dial(client.Options{})
 ```
 Do:
 ```go
@@ -160,15 +160,15 @@ c.ExecuteWorkflow(ctx, opts, name, param).Get(ctx, &ret)
 Do:
 ```go
 // Globally define the namespace, queue and workflow type (one time, in a centralized package for the queue)
-var nsDefault = tstemporal.NewNamespace(client.DefaultNamespace)
-var queueMain = tstemporal.NewQueue(nsDefault, "main")
+var nsDefault = tempts.NewNamespace(client.DefaultNamespace)
+var queueMain = tempts.NewQueue(nsDefault, "main")
 type exampleWorkflowParamType struct{
     Param string
 }
 type exampleWorkflowReturnType struct{
     Return string
 }
-var exampleWorkflowType = tstemporal.NewWorkflow[exampleWorkflowParamType, exampleWorkflowReturnType](queueMain, "ExampleWorkflow")
+var exampleWorkflowType = tempts.NewWorkflow[exampleWorkflowParamType, exampleWorkflowReturnType](queueMain, "ExampleWorkflow")
 
 // Run and get the result of the workflow
 ret, err := exampleWorkflowType.Run(ctx, c, opts, param)
@@ -186,15 +186,15 @@ workflow.ExecuteActivity(ctx, name, param).Get(ctx, &ret)
 Do:
 ```go
 // Globally define the namespace, queue and activity type (one time, in a centralized package for the queue)
-var nsDefault = tstemporal.NewNamespace(client.DefaultNamespace)
-var queueMain = tstemporal.NewQueue(nsDefault, "main")
+var nsDefault = tempts.NewNamespace(client.DefaultNamespace)
+var queueMain = tempts.NewQueue(nsDefault, "main")
 type exampleActivityParamType struct{
     Param string
 }
 type exampleActivityReturnType struct{
     Return string
 }
-var exampleActivityType = tstemporal.NewActivity[exampleActivityParamType, exampleActivityReturnType](queueMain, "ExampleActivity")
+var exampleActivityType = tempts.NewActivity[exampleActivityParamType, exampleActivityReturnType](queueMain, "ExampleActivity")
 
 // Run and get the result of the activity from a workflow
 ret, err := exampleActivityType.Run(ctx, param)
@@ -213,11 +213,11 @@ err = wrk.Run(worker.InterruptCh())
 Do:
 ```go
 // Globally define the namespace and queue (one time, in a centralized package for the queue)
-var nsDefault = tstemporal.NewNamespace(client.DefaultNamespace)
-var queueMain = tstemporal.NewQueue(nsDefault, "main")
+var nsDefault = tempts.NewNamespace(client.DefaultNamespace)
+var queueMain = tempts.NewQueue(nsDefault, "main")
 
 // On start up of your service
-wrk, err := tstemporal.NewWorker(queueMain, []tstemporal.Registerable{
+wrk, err := tempts.NewWorker(queueMain, []tempts.Registerable{
     exampleWorkflowType.WithImplementation(exampleWorkflow),
     exampleActivityType.WithImplementation(exampleActivity),
 })
@@ -244,7 +244,7 @@ err = response.Get(&value)
 Do:
 ```go
 // Globally define the query type
-var exampleQueryType = tstemporal.NewQueryHandler[queryParamType, queryReturnType]("exampleQuery")
+var exampleQueryType = tempts.NewQueryHandler[queryParamType, queryReturnType]("exampleQuery")
 
 // In the workflow
 exampleQueryType.SetHandler(ctx, func(queryParamType) (queryReturnType, error) {
@@ -303,17 +303,17 @@ This ensures that the namespace and queue are correct for the workflow. It also 
 Instead of: coming up with your own strategy to build fixture based tests
 Do:
 ```go
-c, err := tstemporal.Dial(client.Options{})
+c, err := tempts.Dial(client.Options{})
 if err != nil {
     t.Fatal(err)
 }
 workflowImpl := exampleWorkflowType.WithImplementation(exampleWorkflow)
-historiesData, err = tstemporal.GetWorkflowHistoriesBundle(ctx, c, workflowImpl)
+historiesData, err = tempts.GetWorkflowHistoriesBundle(ctx, c, workflowImpl)
 if err != nil {
     t.Fatal(err)
 }
 // Now store historiesData somewhere! (Or don't and make sure your test is always connected to a temporal instance with example workflow runs)
-err := tstemporal.ReplayWorkflow(historiesData, workflowImpl)
+err := tempts.ReplayWorkflow(historiesData, workflowImpl)
 if err != nil {
     t.Fatal(err)
 }
