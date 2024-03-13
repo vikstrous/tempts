@@ -12,13 +12,8 @@ type Worker struct {
 	registerables []Registerable
 }
 
-type Registry interface {
-	worker.WorkflowRegistry
-	worker.ActivityRegistry
-}
-
 type Registerable interface {
-	register(ar Registry)
+	register(ar worker.Registry)
 	// Make sure this activity or workflow is valid for this queue
 	validate(q *Queue, v *ValidationState) error
 }
@@ -62,6 +57,12 @@ func NewWorker(queue *Queue, registerables []Registerable) (*Worker, error) {
 	return &Worker{queue: queue, registerables: registerables}, nil
 }
 
+func (w *Worker) Register(wrk worker.Registry) {
+	for _, r := range w.registerables {
+		r.register(wrk)
+	}
+}
+
 // Run starts the worker. To stop it, cancel the context. This function returns when the worker completes.
 // Make sure to always cancel the context eventually, or a goroutine will be leaked.
 func (w *Worker) Run(ctx context.Context, client *Client, options worker.Options) error {
@@ -69,10 +70,7 @@ func (w *Worker) Run(ctx context.Context, client *Client, options worker.Options
 		return fmt.Errorf("worker for namespace %s can't be started with client with namespace %s", w.queue.namespace.name, client.namespace)
 	}
 	wrk := worker.New(client.Client, w.queue.name, options)
-
-	for _, r := range w.registerables {
-		r.register(wrk)
-	}
+	w.Register(wrk)
 
 	go func() {
 		// There's no way to pass the channel from ctx.Done directly into Run because it's of the wrong type.

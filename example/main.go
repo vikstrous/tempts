@@ -24,8 +24,8 @@ var (
 )
 
 var (
-	workflowTypeJustGreet = tempts.NewWorkflow[string, struct{}](queueMain, "greet")
-	activityTypeGreet     = tempts.NewActivity[string, struct{}](queueMain, "greet")
+	workflowTypeJustGreet = tempts.NewWorkflow[string, string](queueMain, "greet")
+	activityTypeGreet     = tempts.NewActivity[string, string](queueMain, "greet")
 )
 
 func main() {
@@ -118,21 +118,22 @@ func workflowFormatAndGreet(ctx workflow.Context, name string) (string, error) {
 	// Give the caller a chance to do an update
 	workflow.Sleep(ctx, time.Second*1)
 
-	_, err = workflowTypeJustGreet.RunChild(ctx, workflow.ChildWorkflowOptions{}, newName)
+	final, err := workflowTypeJustGreet.RunChild(ctx, workflow.ChildWorkflowOptions{}, newName)
 	if err != nil {
 		return "", err
 	}
+	fmt.Println("final", final)
 	return newName, nil
 }
 
-func workflowJustGreet(ctx workflow.Context, name string) (struct{}, error) {
+func workflowJustGreet(ctx workflow.Context, name string) (string, error) {
 	ctx = workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
 		StartToCloseTimeout: time.Second * 10,
 	})
 	return activityTypeGreet.Run(ctx, name)
 }
 
-func activityGreet(ctx context.Context, name string) (struct{}, error) {
+func activityGreet(ctx context.Context, name string) (string, error) {
 	fmt.Printf("Hello %s\n", name)
-	return struct{}{}, nil
+	return name, nil
 }

@@ -15,7 +15,7 @@ type ActivityWithImpl struct {
 	fn           any
 }
 
-func (a ActivityWithImpl) register(ar Registry) {
+func (a ActivityWithImpl) register(ar worker.Registry) {
 	ar.RegisterActivityWithOptions(a.fn, activity.RegisterOptions{Name: a.activityName})
 }
 
@@ -56,8 +56,4 @@ func (a Activity[Param, Return]) Run(ctx workflow.Context, param Param) (Return,
 
 func (a Activity[Param, Return]) Execute(ctx workflow.Context, param Param) workflow.Future {
 	return workflow.ExecuteActivity(workflow.WithWorkflowNamespace(workflow.WithTaskQueue(ctx, a.queue.name), a.queue.namespace.name), a.Name, param)
-}
-
-func (a Activity[Param, Return]) Register(w worker.ActivityRegistry, fn func(context.Context, Param) (Return, error)) {
-	w.RegisterActivityWithOptions(fn, activity.RegisterOptions{Name: a.Name})
 }

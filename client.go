@@ -34,3 +34,10 @@ func Dial(opts client.Options) (*Client, error) {
 	}
 	return &Client{Client: c, namespace: namespace}, nil
 }
+
+func NewFromSDK(c client.Client, namespace string) (*Client, error) {
+	if namespace == "" {
+		namespace = client.DefaultNamespace
+	}
+	return &Client{Client: c, namespace: namespace}, nil
+}

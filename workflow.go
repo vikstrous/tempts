@@ -17,22 +17,26 @@ type WorkflowWithImpl struct {
 	fn           any
 }
 
-func (a WorkflowWithImpl) register(ar Registry) {
-	ar.RegisterWorkflowWithOptions(a.fn, workflow.RegisterOptions{Name: a.workflowName})
+func (w WorkflowWithImpl) Name() string {
+	return w.workflowName
 }
 
-func (a WorkflowWithImpl) validate(q *Queue, v *ValidationState) error {
-	if a.queue.name != q.name {
-		return fmt.Errorf("workflow for queue %s can't be registered on worker with queue %s", a.queue.name, q.name)
+func (w WorkflowWithImpl) register(ar worker.Registry) {
+	ar.RegisterWorkflowWithOptions(w.fn, workflow.RegisterOptions{Name: w.workflowName})
+}
+
+func (w WorkflowWithImpl) validate(q *Queue, v *ValidationState) error {
+	if w.queue.name != q.name {
+		return fmt.Errorf("workflow for queue %s can't be registered on worker with queue %s", w.queue.name, q.name)
 	}
-	if a.queue.namespace.name != q.namespace.name {
-		return fmt.Errorf("workflow for namespace %s can't be registered on worker with namespace %s", a.queue.namespace.name, q.namespace.name)
+	if w.queue.namespace.name != q.namespace.name {
+		return fmt.Errorf("workflow for namespace %s can't be registered on worker with namespace %s", w.queue.namespace.name, q.namespace.name)
 	}
-	_, ok := v.workflowsValidated[a.workflowName]
+	_, ok := v.workflowsValidated[w.workflowName]
 	if ok {
-		return fmt.Errorf("duplicate activtity name %s for queue %s and namespace %s", a.workflowName, q.name, q.namespace.name)
+		return fmt.Errorf("duplicate activtity name %s for queue %s and namespace %s", w.workflowName, q.name, q.namespace.name)
 	}
-	v.workflowsValidated[a.workflowName] = struct{}{}
+	v.workflowsValidated[w.workflowName] = struct{}{}
 	return nil
 }
 
@@ -123,12 +127,6 @@ func NewWorkflow[
 
 func (w Workflow[Param, Return]) WithImplementation(fn func(workflow.Context, Param) (Return, error)) *WorkflowWithImpl {
 	return &WorkflowWithImpl{workflowName: w.Name, queue: *w.queue, fn: fn}
-}
-
-func (w Workflow[Param, Return]) Register(wr worker.WorkflowRegistry, fn func(workflow.Context, Param) (Return, error)) {
-	wr.RegisterWorkflowWithOptions(fn, workflow.RegisterOptions{
-		Name: w.Name,
-	})
 }
 
 func (w Workflow[Param, Return]) Run(ctx context.Context, temporalClient *Client, opts client.StartWorkflowOptions, param Param) (Return, error) {
