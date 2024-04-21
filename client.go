@@ -13,6 +13,7 @@ func (c *Client) Close() {
 	c.Client.Close()
 }
 
+// NewLazyClient is equivalent to Dial, but doesn't conect to the server until necessary.
 func NewLazyClient(opts client.Options) (*Client, error) {
 	namespace := client.DefaultNamespace
 	if opts.Namespace != "" {
