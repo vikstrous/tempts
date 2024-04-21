@@ -14,7 +14,8 @@ import (
 	"go.temporal.io/sdk/workflow"
 )
 
-// GetWorkflowHistoriesBundle connects to the temporal server and
+// GetWorkflowHistoriesBundle connects to the temporal server and fetches the most recent 10 open and 10 closed executions.
+// It returns a byte seralized piece of data that can be used immediately or in the future to call ReplayWorkflow.
 func GetWorkflowHistoriesBundle(ctx context.Context, client *Client, w WorkflowDeclaration) ([]byte, error) {
 	if client.namespace != w.getQueue().namespace.name {
 		return nil, fmt.Errorf("namespace for client %s doesn't match namespace for workflow %s", client.namespace, w.getQueue().namespace.name)
@@ -90,6 +91,7 @@ type historiesData struct {
 	WorkflowName string
 }
 
+// ReplayWorkflow is meant to be used in tests with the output of GetWorkflowHistoriesBundle to check if the given workflow implementation (fn) is compatible with previous executions captured at the time when GetWorkflowHistoriesBundle was run.
 func ReplayWorkflow(historiesBytes []byte, fn any) error {
 	var historiesData historiesData
 	err := json.Unmarshal(historiesBytes, &historiesData)

@@ -19,10 +19,9 @@ func init() {
 }
 
 func TestFormatAndGreetReplayability(t *testing.T) {
-	workflowImpl := workflowTypeFormatAndGreet.WithImplementation(workflowFormatAndGreet)
 	filename := fmt.Sprintf("histories/%s.json", workflowTypeFormatAndGreet.Name())
 
-	testReplayability(t, workflowImpl, workflowFormatAndGreet, filename)
+	testReplayability(t, workflowTypeFormatAndGreet, workflowFormatAndGreet, filename)
 }
 
 func testReplayability(t *testing.T, workflowDeclaration tempts.WorkflowDeclaration, fn any, filename string) {

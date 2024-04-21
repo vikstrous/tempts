@@ -24,13 +24,6 @@ func (w WorkflowWithImpl[Param, Return]) Name() string {
 	return w.workflowName
 }
 
-func (w WorkflowWithImpl[Param, Return]) getQueue() Queue {
-	return w.queue
-}
-func (w WorkflowWithImpl[Param, Return]) getFn() any {
-	return w.fn
-}
-
 func (w WorkflowWithImpl[Param, Return]) register(ar worker.Registry) {
 	ar.RegisterWorkflowWithOptions(w.fn, workflow.RegisterOptions{Name: w.workflowName})
 }
@@ -70,7 +63,7 @@ func (w WorkflowWithImpl[Param, Return]) ExecuteInTest(e testEnvironment, p Para
 // WorkflowDeclaration always contains Workflow but doesn't have type parameters, so it can be passed into non-generic functions.
 type WorkflowDeclaration interface {
 	Name() string
-	getQueue() Queue
+	getQueue() *Queue
 }
 
 // Workflow is used for interacting with workflows in a safe way that takes into account the input and output types, queue name and other properties.
