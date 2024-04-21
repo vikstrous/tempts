@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"go.temporal.io/api/serviceerror"
 	"go.temporal.io/sdk/client"
@@ -11,21 +12,30 @@ import (
 	"go.temporal.io/sdk/workflow"
 )
 
-type WorkflowWithImpl struct {
+// WorkflowWithImpl is a temporary struct that implements Registerable. It's meant to be passed into `tempts.NewWorker`.
+type WorkflowWithImpl[Param any, Return any] struct {
 	workflowName string
 	queue        Queue
 	fn           any
 }
 
-func (w WorkflowWithImpl) Name() string {
+// Name returns the name of the workflow being implemented.
+func (w WorkflowWithImpl[Param, Return]) Name() string {
 	return w.workflowName
 }
 
-func (w WorkflowWithImpl) register(ar worker.Registry) {
+func (w WorkflowWithImpl[Param, Return]) getQueue() Queue {
+	return w.queue
+}
+func (w WorkflowWithImpl[Param, Return]) getFn() any {
+	return w.fn
+}
+
+func (w WorkflowWithImpl[Param, Return]) register(ar worker.Registry) {
 	ar.RegisterWorkflowWithOptions(w.fn, workflow.RegisterOptions{Name: w.workflowName})
 }
 
-func (w WorkflowWithImpl) validate(q *Queue, v *ValidationState) error {
+func (w WorkflowWithImpl[Param, Return]) validate(q *Queue, v *validationState) error {
 	if w.queue.name != q.name {
 		return fmt.Errorf("workflow for queue %s can't be registered on worker with queue %s", w.queue.name, q.name)
 	}
@@ -38,6 +48,116 @@ func (w WorkflowWithImpl) validate(q *Queue, v *ValidationState) error {
 	}
 	v.workflowsValidated[w.workflowName] = struct{}{}
 	return nil
+}
+
+type testEnvironment interface {
+	ExecuteWorkflow(workflowFn interface{}, args ...interface{})
+	GetWorkflowResult(valuePtr interface{}) error
+	GetWorkflowError() error
+}
+
+// ExecuteInTest executes the given workflow implementation in a unit test and returns the output of the workflow.
+func (w WorkflowWithImpl[Param, Return]) ExecuteInTest(e testEnvironment, p Param) (Return, error) {
+	e.ExecuteWorkflow(w.fn, p)
+	var ret Return
+	err := e.GetWorkflowResult(&ret)
+	if err != nil {
+		return ret, err
+	}
+	return ret, e.GetWorkflowError()
+}
+
+// WorkflowDeclaration always contains Workflow but doesn't have type parameters, so it can be passed into non-generic functions.
+type WorkflowDeclaration interface {
+	Name() string
+	getQueue() Queue
+}
+
+// Workflow is used for interacting with workflows in a safe way that takes into account the input and output types, queue name and other properties.
+// Workflows are resumable functions registered on workers that execute activities.
+type Workflow[Param any, Return any] struct {
+	name  string
+	queue *Queue
+}
+
+// NewWorkflow declares the existence of a workflow on a given queue with a given name.
+func NewWorkflow[
+	Param any,
+	Return any,
+](queue *Queue, name string,
+) Workflow[Param, Return] {
+	queue.registerWorkflow(name, (func(context.Context, Param) (Return, error))(nil))
+	return Workflow[Param, Return]{
+		name:  name,
+		queue: queue,
+	}
+}
+
+// Name returns the name of the workflow.
+func (w Workflow[Param, Return]) Name() string {
+	return w.name
+}
+
+// getQueue returns the queue for the workflow
+func (w Workflow[Param, Return]) getQueue() *Queue {
+	return w.queue
+}
+
+// WithImplementation should be called to create the parameters for NewWorker(). It declares which function implements the workflow.
+func (w Workflow[Param, Return]) WithImplementation(fn func(workflow.Context, Param) (Return, error)) *WorkflowWithImpl[Param, Return] {
+	return &WorkflowWithImpl[Param, Return]{workflowName: w.name, queue: *w.queue, fn: func(ctx workflow.Context, param Param) (Return, error) {
+		// Set a default timeout so if a workflow doesn't need to customize it, it doesn't have to call this function.
+		ctx = workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
+			StartToCloseTimeout: time.Second * 10,
+		})
+		return fn(ctx, param)
+	}}
+}
+
+// Run executes the workflow and synchronously returns the output.
+func (w Workflow[Param, Return]) Run(ctx context.Context, temporalClient *Client, opts client.StartWorkflowOptions, param Param) (Return, error) {
+	var ret Return
+	r, err := w.Execute(ctx, temporalClient, opts, param)
+	if err != nil {
+		return ret, err
+	}
+	err = r.Get(ctx, &ret)
+	return ret, err
+}
+
+// Execute asynchnronously executes the workflow and returns a promise.
+func (w Workflow[Param, Return]) Execute(ctx context.Context, temporalClient *Client, opts client.StartWorkflowOptions, param Param) (client.WorkflowRun, error) {
+	opts.TaskQueue = w.queue.name
+	if w.queue.namespace.name != temporalClient.namespace {
+		// The user must provide a client that's connected to the right namespace to be able to start this workflow.
+		return nil, fmt.Errorf("wrong namespace for client %s vs workflow %s", temporalClient.namespace, w.queue.namespace.name)
+	}
+	return temporalClient.Client.ExecuteWorkflow(ctx, opts, w.name, param)
+}
+
+// Run executes the workflow from another parent workflow and synchronously returns the output.
+func (w Workflow[Param, Return]) RunChild(ctx workflow.Context, opts workflow.ChildWorkflowOptions, param Param) (Return, error) {
+	var ret Return
+	err := w.ExecuteChild(ctx, opts, param).Get(ctx, &ret)
+	if err != nil {
+		return ret, err
+	}
+	return ret, nil
+}
+
+// Execute asynchnronously executes the workflow from another parent workflow and returns a promise.
+func (w Workflow[Param, Return]) ExecuteChild(ctx workflow.Context, opts workflow.ChildWorkflowOptions, param Param) workflow.ChildWorkflowFuture {
+	opts.TaskQueue = w.queue.name
+	opts.Namespace = w.queue.namespace.name
+	return workflow.ExecuteChildWorkflow(workflow.WithChildOptions(ctx, opts), w.name, param)
+}
+
+// SetSchedule creates or updates the schedule to match the given definition.
+// WARNING:
+// This feature is not as seamless as it could be because of the complex API exposed by temporal.
+// In some cases, when the schedule has been modified in some non-updateable way, this method can't update the schedule and it returns an error.
+func (w Workflow[Param, Return]) SetSchedule(ctx context.Context, temporalClient *Client, opts client.ScheduleOptions, param Param) error {
+	return setSchedule(ctx, temporalClient, opts, w.name, w.queue, []any{param})
 }
 
 func setSchedule(ctx context.Context, temporalClient *Client, opts client.ScheduleOptions, workflowName string, queue *Queue, args []any) error {
@@ -106,63 +226,4 @@ func setSchedule(ctx context.Context, temporalClient *Client, opts client.Schedu
 		return err
 	}
 	return nil
-}
-
-type Workflow[Param any, Return any] struct {
-	Name  string
-	queue *Queue
-}
-
-func NewWorkflow[
-	Param any,
-	Return any,
-](queue *Queue, name string,
-) Workflow[Param, Return] {
-	queue.registerWorkflow(name, (func(context.Context, Param) (Return, error))(nil))
-	return Workflow[Param, Return]{
-		Name:  name,
-		queue: queue,
-	}
-}
-
-func (w Workflow[Param, Return]) WithImplementation(fn func(workflow.Context, Param) (Return, error)) *WorkflowWithImpl {
-	return &WorkflowWithImpl{workflowName: w.Name, queue: *w.queue, fn: fn}
-}
-
-func (w Workflow[Param, Return]) Run(ctx context.Context, temporalClient *Client, opts client.StartWorkflowOptions, param Param) (Return, error) {
-	var ret Return
-	r, err := w.Execute(ctx, temporalClient, opts, param)
-	if err != nil {
-		return ret, err
-	}
-	err = r.Get(ctx, &ret)
-	return ret, err
-}
-
-func (w Workflow[Param, Return]) Execute(ctx context.Context, temporalClient *Client, opts client.StartWorkflowOptions, param Param) (client.WorkflowRun, error) {
-	opts.TaskQueue = w.queue.name
-	if w.queue.namespace.name != temporalClient.namespace {
-		// The user must provide a client that's connected to the right namespace to be able to start this workflow.
-		return nil, fmt.Errorf("wrong namespace for client %s vs workflow %s", temporalClient.namespace, w.queue.namespace.name)
-	}
-	return temporalClient.Client.ExecuteWorkflow(ctx, opts, w.Name, param)
-}
-
-func (w Workflow[Param, Return]) RunChild(ctx workflow.Context, opts workflow.ChildWorkflowOptions, param Param) (Return, error) {
-	var ret Return
-	err := w.ExecuteChild(ctx, opts, param).Get(ctx, &ret)
-	if err != nil {
-		return ret, err
-	}
-	return ret, nil
-}
-
-func (w Workflow[Param, Return]) ExecuteChild(ctx workflow.Context, opts workflow.ChildWorkflowOptions, param Param) workflow.ChildWorkflowFuture {
-	opts.TaskQueue = w.queue.name
-	opts.Namespace = w.queue.namespace.name
-	return workflow.ExecuteChildWorkflow(workflow.WithChildOptions(ctx, opts), w.Name, param)
-}
-
-func (w Workflow[Param, Return]) SetSchedule(ctx context.Context, temporalClient *Client, opts client.ScheduleOptions, param Param) error {
-	return setSchedule(ctx, temporalClient, opts, w.Name, w.queue, []any{param})
 }

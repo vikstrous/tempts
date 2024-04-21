@@ -74,9 +74,6 @@ func main() {
 
 // helloWorkflow is a workflow function that calls the HelloActivity.
 func helloWorkflow(ctx workflow.Context, _ struct{}) (struct{}, error) {
-    ctx = workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
-        StartToCloseTimeout: time.Second * 10,
-    })
     return activityTypeHello.Run(ctx, struct{}{})
 }
 

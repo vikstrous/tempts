@@ -20,12 +20,12 @@ func init() {
 
 func TestFormatAndGreetReplayability(t *testing.T) {
 	workflowImpl := workflowTypeFormatAndGreet.WithImplementation(workflowFormatAndGreet)
-	filename := fmt.Sprintf("histories/%s.json", workflowTypeFormatAndGreet.Name)
+	filename := fmt.Sprintf("histories/%s.json", workflowTypeFormatAndGreet.Name())
 
-	testReplayability(t, workflowImpl, filename)
+	testReplayability(t, workflowImpl, workflowFormatAndGreet, filename)
 }
 
-func testReplayability(t *testing.T, workflowImpl *tempts.WorkflowWithImpl, filename string) {
+func testReplayability(t *testing.T, workflowDeclaration tempts.WorkflowDeclaration, fn any, filename string) {
 	var historiesData []byte
 	if record {
 		ctx := context.Background()
@@ -33,7 +33,7 @@ func testReplayability(t *testing.T, workflowImpl *tempts.WorkflowWithImpl, file
 		if err != nil {
 			t.Fatal(err)
 		}
-		historiesData, err = tempts.GetWorkflowHistoriesBundle(ctx, c, workflowImpl)
+		historiesData, err = tempts.GetWorkflowHistoriesBundle(ctx, c, workflowDeclaration)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -50,7 +50,7 @@ func testReplayability(t *testing.T, workflowImpl *tempts.WorkflowWithImpl, file
 		}
 	}
 
-	err := tempts.ReplayWorkflow(historiesData, workflowImpl)
+	err := tempts.ReplayWorkflow(historiesData, fn)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -12,9 +12,7 @@ import (
 	"go.temporal.io/sdk/workflow"
 )
 
-var nsDefault = tempts.NewNamespace(client.DefaultNamespace)
-
-var queueMain = tempts.NewQueue(nsDefault, "main")
+var queueMain = tempts.NewQueue(tempts.DefaultNamespace, "main")
 
 var (
 	workflowTypeFormatAndGreet        = tempts.NewWorkflow[string, string](queueMain, "format_and_greet")
@@ -97,9 +95,6 @@ func activityFormatName(ctx context.Context, input string) (string, error) {
 
 func workflowFormatAndGreet(ctx workflow.Context, name string) (string, error) {
 	newName := "unknown"
-	ctx = workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
-		StartToCloseTimeout: time.Second * 10,
-	})
 	workflowTypeFormatAndGreetGetName.SetHandler(ctx, func(struct{}) (string, error) {
 		return newName, nil
 	})
@@ -127,9 +122,6 @@ func workflowFormatAndGreet(ctx workflow.Context, name string) (string, error) {
 }
 
 func workflowJustGreet(ctx workflow.Context, name string) (string, error) {
-	ctx = workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
-		StartToCloseTimeout: time.Second * 10,
-	})
 	return activityTypeGreet.Run(ctx, name)
 }
 

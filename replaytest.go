@@ -14,25 +14,26 @@ import (
 	"go.temporal.io/sdk/workflow"
 )
 
-func GetWorkflowHistoriesBundle(ctx context.Context, client *Client, w *WorkflowWithImpl) ([]byte, error) {
-	if client.namespace != w.queue.namespace.name {
-		return nil, fmt.Errorf("namespace for client %s doesn't match namespace for workflow %s", client.namespace, w.queue.namespace.name)
+// GetWorkflowHistoriesBundle connects to the temporal server and
+func GetWorkflowHistoriesBundle(ctx context.Context, client *Client, w WorkflowDeclaration) ([]byte, error) {
+	if client.namespace != w.getQueue().namespace.name {
+		return nil, fmt.Errorf("namespace for client %s doesn't match namespace for workflow %s", client.namespace, w.getQueue().namespace.name)
 	}
 	closedExecutions, err := client.Client.WorkflowService().ListClosedWorkflowExecutions(ctx, &workflowservice.ListClosedWorkflowExecutionsRequest{
-		Namespace:       w.queue.namespace.name,
+		Namespace:       w.getQueue().namespace.name,
 		MaximumPageSize: 10,
 		Filters: &workflowservice.ListClosedWorkflowExecutionsRequest_TypeFilter{
-			TypeFilter: &filter.WorkflowTypeFilter{Name: w.workflowName},
+			TypeFilter: &filter.WorkflowTypeFilter{Name: w.Name()},
 		},
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get closed executions: %w", err)
 	}
 	openExecutions, err := client.Client.WorkflowService().ListOpenWorkflowExecutions(ctx, &workflowservice.ListOpenWorkflowExecutionsRequest{
-		Namespace:       w.queue.namespace.name,
+		Namespace:       w.getQueue().namespace.name,
 		MaximumPageSize: 10,
 		Filters: &workflowservice.ListOpenWorkflowExecutionsRequest_TypeFilter{
-			TypeFilter: &filter.WorkflowTypeFilter{Name: w.workflowName},
+			TypeFilter: &filter.WorkflowTypeFilter{Name: w.Name()},
 		},
 	})
 	if err != nil {
@@ -54,7 +55,9 @@ func GetWorkflowHistoriesBundle(ctx context.Context, client *Client, w *Workflow
 		hists = append(hists, &hist)
 	}
 
-	historiesData := historiesData{}
+	historiesData := historiesData{
+		WorkflowName: w.Name(),
+	}
 	for i, h := range hists {
 		if len(h.Events) < 3 {
 			// The relay code requires history to have at least 3 events, so 2 even histories are considered invalid.
@@ -83,10 +86,11 @@ type historyWithMetadata struct {
 	HistoryBytes []byte
 }
 type historiesData struct {
-	Histories []historyWithMetadata
+	Histories    []historyWithMetadata
+	WorkflowName string
 }
 
-func ReplayWorkflow(historiesBytes []byte, w *WorkflowWithImpl) error {
+func ReplayWorkflow(historiesBytes []byte, fn any) error {
 	var historiesData historiesData
 	err := json.Unmarshal(historiesBytes, &historiesData)
 	if err != nil {
@@ -96,8 +100,8 @@ func ReplayWorkflow(historiesBytes []byte, w *WorkflowWithImpl) error {
 		return fmt.Errorf("no histories available")
 	}
 	replayer := worker.NewWorkflowReplayer()
-	replayer.RegisterWorkflowWithOptions(w.fn, workflow.RegisterOptions{
-		Name: w.workflowName,
+	replayer.RegisterWorkflowWithOptions(fn, workflow.RegisterOptions{
+		Name: historiesData.WorkflowName,
 	})
 	for _, histData := range historiesData.Histories {
 		var h history.History
@@ -111,7 +115,7 @@ func ReplayWorkflow(historiesBytes []byte, w *WorkflowWithImpl) error {
 
 		err = replayer.ReplayWorkflowHistoryWithOptions(nil, &h, opts)
 		if err != nil {
-			return fmt.Errorf("failed to replay workflow %s: %w", w.workflowName, err)
+			return fmt.Errorf("failed to replay workflow %s: %w", historiesData.WorkflowName, err)
 		}
 	}
 	return nil

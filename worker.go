@@ -7,24 +7,38 @@ import (
 	"go.temporal.io/sdk/worker"
 )
 
+// Worker represents a temporal worker that connects to the temporal server to execute activities and workflows.
 type Worker struct {
 	queue         *Queue
 	registerables []Registerable
 }
 
+// Registerable can be created by calling WithImplementation() on activity or workflow definitions.
+// It's a parameter to `tempts.NewWorker()`.
 type Registerable interface {
 	register(ar worker.Registry)
 	// Make sure this activity or workflow is valid for this queue
-	validate(q *Queue, v *ValidationState) error
+	validate(q *Queue, v *validationState) error
 }
 
-type ValidationState struct {
+type validationState struct {
 	activitiesValidated map[string]struct{}
 	workflowsValidated  map[string]struct{}
 }
 
+// NewWorker defines a worker along with all of the workflows and activities. Example usage:
+/*
+```go
+wrk, err := tempts.NewWorker(queueMain, []tempts.Registerable{
+	activityTypeFormatName.WithImplementation(activityFormatName),
+	activityTypeGreet.WithImplementation(activityGreet),
+	workflowTypeFormatAndGreet.WithImplementation(workflowFormatAndGreet),
+	workflowTypeJustGreet.WithImplementation(workflowJustGreet),
+})
+```
+*/
 func NewWorker(queue *Queue, registerables []Registerable) (*Worker, error) {
-	v := &ValidationState{
+	v := &validationState{
 		activitiesValidated: map[string]struct{}{},
 		workflowsValidated:  map[string]struct{}{},
 	}
@@ -57,6 +71,7 @@ func NewWorker(queue *Queue, registerables []Registerable) (*Worker, error) {
 	return &Worker{queue: queue, registerables: registerables}, nil
 }
 
+// Register is useful in unit tests to define all of the worker's workflows and activities in the test environment.
 func (w *Worker) Register(wrk worker.Registry) {
 	for _, r := range w.registerables {
 		r.register(wrk)
@@ -79,5 +94,3 @@ func (w *Worker) Run(ctx context.Context, client *Client, options worker.Options
 	}()
 	return wrk.Run(nil)
 }
-
-// TODO: how do we force you to register the right activities and workflows on this worker???
