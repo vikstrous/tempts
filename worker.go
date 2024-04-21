@@ -28,14 +28,12 @@ type validationState struct {
 
 // NewWorker defines a worker along with all of the workflows and activities. Example usage:
 /*
-```go
 wrk, err := tempts.NewWorker(queueMain, []tempts.Registerable{
 	activityTypeFormatName.WithImplementation(activityFormatName),
 	activityTypeGreet.WithImplementation(activityGreet),
 	workflowTypeFormatAndGreet.WithImplementation(workflowFormatAndGreet),
 	workflowTypeJustGreet.WithImplementation(workflowJustGreet),
 })
-```
 */
 func NewWorker(queue *Queue, registerables []Registerable) (*Worker, error) {
 	v := &validationState{
