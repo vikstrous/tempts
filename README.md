@@ -304,13 +304,12 @@ c, err := tempts.Dial(client.Options{})
 if err != nil {
     t.Fatal(err)
 }
-workflowImpl := exampleWorkflowType.WithImplementation(exampleWorkflow)
-historiesData, err = tempts.GetWorkflowHistoriesBundle(ctx, c, workflowImpl)
+historiesData, err = tempts.GetWorkflowHistoriesBundle(ctx, c, exampleWorkflowType)
 if err != nil {
     t.Fatal(err)
 }
 // Now store historiesData somewhere! (Or don't and make sure your test is always connected to a temporal instance with example workflow runs)
-err := tempts.ReplayWorkflow(historiesData, workflowImpl)
+err := tempts.ReplayWorkflow(historiesData, exampleWorkflow)
 if err != nil {
     t.Fatal(err)
 }
