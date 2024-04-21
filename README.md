@@ -323,7 +323,7 @@ Since this library is opinionated, it doesn't support all temporal features. To 
 * All workflows must take at most one parameter and return at most one parameter.
 * All activities must take at most one parameter and return at most one parameter.
 * Namespaces names and queues names must be static (assuming that your types are defined as global variables so they can be used anywhere).
-* All workflows and activities for the queue must be known.
+* All workflows and activities for a given queue must be migrated at once.
 * All types must be defined as Go structs that follow the Temporal Go SDK's marshaling and unmarshaling logic.
 
 There maybe more restrictions that I'm not aware of yet. Open an issue if any are missed.
