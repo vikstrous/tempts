@@ -17,7 +17,6 @@ var queueMain = tempts.NewQueue(tempts.DefaultNamespace, "main")
 var (
 	workflowTypeFormatAndGreet        = tempts.NewWorkflow[string, string](queueMain, "format_and_greet")
 	workflowTypeFormatAndGreetGetName = tempts.NewQueryHandler[struct{}, string]("get_formatted_name")
-	workflowTypeFormatAndGreetSetName = tempts.NewUpdateHandler[string, string]("set_formatted_name")
 	activityTypeFormatName            = tempts.NewActivity[string, string](queueMain, "format_name")
 )
 
@@ -59,14 +58,6 @@ func main() {
 		panic(err)
 	}
 	fmt.Printf("Expecting unknown name from the query: %s\n", newName)
-	// TODO: uncomment this after testing with the feature enabled in temporal
-	//
-	// time.Sleep(time.Second) // wait for the name to be formatted, then replace it
-	// newName, err = workflowTypeFormatAndGreetSetName.Update(ctx, c, workflowHandle.GetID(), workflowHandle.GetRunID(), "Roger")
-	// if err != nil {
-	// 	panic(err)
-	// }
-	// fmt.Printf("Name returned from the update: %s\n", newName)
 
 	err = workflowHandle.Get(ctx, &newName)
 	if err != nil {
@@ -97,10 +88,6 @@ func workflowFormatAndGreet(ctx workflow.Context, name string) (string, error) {
 	newName := "unknown"
 	workflowTypeFormatAndGreetGetName.SetHandler(ctx, func(struct{}) (string, error) {
 		return newName, nil
-	})
-	workflowTypeFormatAndGreetSetName.SetHandler(ctx, func(ctx workflow.Context, p string) (string, error) {
-		newName = p
-		return p, nil
 	})
 
 	// Give the example code a chance to read the "unknown" name with the query and update it
