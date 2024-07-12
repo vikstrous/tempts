@@ -82,6 +82,7 @@ func (w *Worker) Run(ctx context.Context, client *Client, options worker.Options
 	if w.queue.namespace.name != client.namespace {
 		return fmt.Errorf("worker for namespace %s can't be started with client with namespace %s", w.queue.namespace.name, client.namespace)
 	}
+	options.DisableRegistrationAliasing = true
 	wrk := worker.New(client.Client, w.queue.name, options)
 	w.Register(wrk)
 
