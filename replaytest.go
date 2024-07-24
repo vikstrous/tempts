@@ -92,7 +92,7 @@ type historiesData struct {
 }
 
 // ReplayWorkflow is meant to be used in tests with the output of GetWorkflowHistoriesBundle to check if the given workflow implementation (fn) is compatible with previous executions captured at the time when GetWorkflowHistoriesBundle was run.
-func ReplayWorkflow(historiesBytes []byte, fn any) error {
+func ReplayWorkflow(historiesBytes []byte, fn any, opts worker.WorkflowReplayerOptions) error {
 	var historiesData historiesData
 	err := json.Unmarshal(historiesBytes, &historiesData)
 	if err != nil {
@@ -101,7 +101,10 @@ func ReplayWorkflow(historiesBytes []byte, fn any) error {
 	if len(historiesData.Histories) == 0 {
 		return fmt.Errorf("no histories available")
 	}
-	replayer := worker.NewWorkflowReplayer()
+	replayer, err := worker.NewWorkflowReplayerWithOptions(opts)
+	if err != nil {
+		return fmt.Errorf("failed to create replayer: %w", err)
+	}
 	replayer.RegisterWorkflowWithOptions(fn, workflow.RegisterOptions{
 		Name: historiesData.WorkflowName,
 	})

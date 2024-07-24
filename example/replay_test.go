@@ -10,6 +10,7 @@ import (
 
 	"github.com/vikstrous/tempts"
 	"go.temporal.io/sdk/client"
+	"go.temporal.io/sdk/worker"
 )
 
 var record bool
@@ -49,7 +50,7 @@ func testReplayability(t *testing.T, workflowDeclaration tempts.WorkflowDeclarat
 		}
 	}
 
-	err := tempts.ReplayWorkflow(historiesData, fn)
+	err := tempts.ReplayWorkflow(historiesData, fn, worker.WorkflowReplayerOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -128,7 +128,7 @@ There are two functions in this library that make it easy to write fixture based
 See `example/main_test.go` for an example of how to use them.
 ```go
 func GetWorkflowHistoriesBundle(ctx context.Context, client *tempts.Client, w *tempts.WorkflowWithImpl) ([]byte, error)
-func ReplayWorkflow(historiesBytes []byte, w *tempts.WorkflowWithImpl) error
+func ReplayWorkflow(historiesBytes []byte, w *tempts.WorkflowWithImpl, opts worker.WorkflowReplayerOptions) error
 ```
 
 ## User guide by example
@@ -309,7 +309,7 @@ if err != nil {
     t.Fatal(err)
 }
 // Now store historiesData somewhere! (Or don't and make sure your test is always connected to a temporal instance with example workflow runs)
-err := tempts.ReplayWorkflow(historiesData, exampleWorkflow)
+err := tempts.ReplayWorkflow(historiesData, exampleWorkflow, worker.WorkflowReplayerOptions{})
 if err != nil {
     t.Fatal(err)
 }
