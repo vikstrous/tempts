@@ -18,6 +18,7 @@ import (
 // It returns a byte seralized piece of data that can be used immediately or in the future to call ReplayWorkflow.
 func GetWorkflowHistoriesBundle(ctx context.Context, client *Client, w WorkflowDeclaration) ([]byte, error) {
 	closedExecutions, err := client.Client.WorkflowService().ListClosedWorkflowExecutions(ctx, &workflowservice.ListClosedWorkflowExecutionsRequest{
+		Namespace:       client.namespace,
 		MaximumPageSize: 10,
 		Filters: &workflowservice.ListClosedWorkflowExecutionsRequest_TypeFilter{
 			TypeFilter: &filter.WorkflowTypeFilter{Name: w.Name()},
@@ -27,6 +28,7 @@ func GetWorkflowHistoriesBundle(ctx context.Context, client *Client, w WorkflowD
 		return nil, fmt.Errorf("failed to get closed executions: %w", err)
 	}
 	openExecutions, err := client.Client.WorkflowService().ListOpenWorkflowExecutions(ctx, &workflowservice.ListOpenWorkflowExecutionsRequest{
+		Namespace:       client.namespace,
 		MaximumPageSize: 10,
 		Filters: &workflowservice.ListOpenWorkflowExecutionsRequest_TypeFilter{
 			TypeFilter: &filter.WorkflowTypeFilter{Name: w.Name()},
