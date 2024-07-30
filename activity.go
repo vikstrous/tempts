@@ -24,12 +24,9 @@ func (a ActivityWithImpl) validate(q *Queue, v *validationState) error {
 	if a.queue.name != q.name {
 		return fmt.Errorf("activity for queue %s can't be registered on worker with queue %s", a.queue.name, q.name)
 	}
-	if a.queue.namespace.name != q.namespace.name {
-		return fmt.Errorf("activity for namespace %s can't be registered on worker with namespace %s", a.queue.namespace.name, q.namespace.name)
-	}
 	_, ok := v.activitiesValidated[a.activityName]
 	if ok {
-		return fmt.Errorf("duplicate activtity name %s for queue %s and namespace %s", a.activityName, q.name, q.namespace.name)
+		return fmt.Errorf("duplicate activtity name %s for queue %s", a.activityName, q.name)
 	}
 	v.activitiesValidated[a.activityName] = struct{}{}
 	return nil
@@ -61,5 +58,5 @@ func (a Activity[Param, Return]) Run(ctx workflow.Context, param Param) (Return,
 
 // Execute asynchnronously executes the activity and returns a promise.
 func (a Activity[Param, Return]) Execute(ctx workflow.Context, param Param) workflow.Future {
-	return workflow.ExecuteActivity(workflow.WithWorkflowNamespace(workflow.WithTaskQueue(ctx, a.queue.name), a.queue.namespace.name), a.Name, param)
+	return workflow.ExecuteActivity(workflow.WithTaskQueue(ctx, a.queue.name), a.Name, param)
 }

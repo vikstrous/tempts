@@ -27,9 +27,8 @@ import (
     "go.temporal.io/sdk/workflow"
 )
 
-// Define a new namespace and task queue.
-var nsDefault = tempts.NewNamespace(client.DefaultNamespace)
-var queueMain = tempts.NewQueue(nsDefault, "main")
+// Define a new task queue.
+var queueMain = tempts.NewQueue("main")
 
 // Define a workflow with no parameters and no return.
 var workflowTypeHello = tempts.NewWorkflow[struct{}, struct{}](queueMain, "HelloWorkflow")
@@ -99,14 +98,14 @@ Workers:
 
 Activities:
 
-* Are called on the right namespace and queue
+* Are called on the right queue
 * Are called with the right parameter types
 * Return the right response types
 * Registered functions match the right type signature
 
 Workflows:
 
-* Are called on the right namespace and queue
+* Are called on the right queue
 * Are called with the right parameter types
 * Return the right response types
 * Registered functions match the right type signature
@@ -145,7 +144,6 @@ Do:
 ```go
 c, err := client.Dial(client.Options{})
 ```
-This creates a wrapper that keeps track of which namespace the client is connected to so that actions are attempted against the wrong namespace, such as starting the wrong workflow, can be caught early.
 
 ### Run a workflow to completion
 
@@ -156,9 +154,8 @@ c.ExecuteWorkflow(ctx, opts, name, param).Get(ctx, &ret)
 ```
 Do:
 ```go
-// Globally define the namespace, queue and workflow type (one time, in a centralized package for the queue)
-var nsDefault = tempts.NewNamespace(client.DefaultNamespace)
-var queueMain = tempts.NewQueue(nsDefault, "main")
+// Globally define the queue and workflow type (one time, in a centralized package for the queue)
+var queueMain = tempts.NewQueue("main")
 type exampleWorkflowParamType struct{
     Param string
 }
@@ -171,7 +168,7 @@ var exampleWorkflowType = tempts.NewWorkflow[exampleWorkflowParamType, exampleWo
 ret, err := exampleWorkflowType.Run(ctx, c, opts, param)
 // Use Execute instead of Run to not wait for completion
 ```
-This ensures that the workflow is run in the right namespace, on the right queue, with the right name, with the right parameter types and it returns the right type.
+This ensures that the workflow is run on the right queue, with the right name, with the right parameter types and it returns the right type.
 
 ### Run an activity to completion
 
@@ -182,9 +179,8 @@ workflow.ExecuteActivity(ctx, name, param).Get(ctx, &ret)
 ```
 Do:
 ```go
-// Globally define the namespace, queue and activity type (one time, in a centralized package for the queue)
-var nsDefault = tempts.NewNamespace(client.DefaultNamespace)
-var queueMain = tempts.NewQueue(nsDefault, "main")
+// Globally define the queue and activity type (one time, in a centralized package for the queue)
+var queueMain = tempts.NewQueue("main")
 type exampleActivityParamType struct{
     Param string
 }
@@ -198,7 +194,7 @@ ret, err := exampleActivityType.Run(ctx, param)
 // Use Execute instead of Run to not wait for completion
 ```
 
-This ensures that the activity is run in the right namespace, on the right queue, with the right name, with the right parameter types and it returns the right type.
+This ensures that the activity is run on the right queue, with the right name, with the right parameter types and it returns the right type.
 
 ### Create a worker
 
@@ -209,8 +205,7 @@ err = wrk.Run(worker.InterruptCh())
 ```
 Do:
 ```go
-// Globally define the namespace and queue (one time, in a centralized package for the queue)
-var nsDefault = tempts.NewNamespace(client.DefaultNamespace)
+// Globally define the queue (one time, in a centralized package for the queue)
 var queueMain = tempts.NewQueue(nsDefault, "main")
 
 // On start up of your service
@@ -293,7 +288,7 @@ err = workflowTypeFormatAndGreet.SetSchedule(ctx, c, client.ScheduleOptions{
 }, param)
 ```
 
-This ensures that the namespace and queue are correct for the workflow. It also ensures that the parameter is the right type and that the schedule is updated to match the one defined in your code. It doesn't handle every possible difference yet because temporal doesn't support arbitrary changes to schedules. This feature is a bit less polished than the rest of the package, so let me know how to improve it!
+This ensures that the queue is correct for the workflow. It also ensures that the parameter is the right type and that the schedule is updated to match the one defined in your code. It doesn't handle every possible difference yet because temporal doesn't support arbitrary changes to schedules. This feature is a bit less polished than the rest of the package, so let me know how to improve it!
 
 ### Fixture based tests
 
@@ -322,7 +317,7 @@ This is really just the cherry on top once you have your type safety in place. B
 Since this library is opinionated, it doesn't support all temporal features. To use this library effectively, the temporal queue you are migrating must meet these pre-requisities:
 * All workflows must take at most one parameter and return at most one parameter.
 * All activities must take at most one parameter and return at most one parameter.
-* Namespaces names and queues names must be static (assuming that your types are defined as global variables so they can be used anywhere).
+* Queues names must be static (assuming that your types are defined as global variables so they can be used anywhere).
 * All workflows and activities for a given queue must be migrated at once.
 * All types must be defined as Go structs that follow the Temporal Go SDK's marshaling and unmarshaling logic.
 

@@ -32,12 +32,9 @@ func (w WorkflowWithImpl[Param, Return]) validate(q *Queue, v *validationState) 
 	if w.queue.name != q.name {
 		return fmt.Errorf("workflow for queue %s can't be registered on worker with queue %s", w.queue.name, q.name)
 	}
-	if w.queue.namespace.name != q.namespace.name {
-		return fmt.Errorf("workflow for namespace %s can't be registered on worker with namespace %s", w.queue.namespace.name, q.namespace.name)
-	}
 	_, ok := v.workflowsValidated[w.workflowName]
 	if ok {
-		return fmt.Errorf("duplicate activtity name %s for queue %s and namespace %s", w.workflowName, q.name, q.namespace.name)
+		return fmt.Errorf("duplicate activtity name %s for queue %s", w.workflowName, q.name)
 	}
 	v.workflowsValidated[w.workflowName] = struct{}{}
 	return nil
@@ -121,10 +118,6 @@ func (w Workflow[Param, Return]) Run(ctx context.Context, temporalClient *Client
 // Execute asynchnronously executes the workflow and returns a promise.
 func (w Workflow[Param, Return]) Execute(ctx context.Context, temporalClient *Client, opts client.StartWorkflowOptions, param Param) (client.WorkflowRun, error) {
 	opts.TaskQueue = w.queue.name
-	if w.queue.namespace.name != temporalClient.namespace {
-		// The user must provide a client that's connected to the right namespace to be able to start this workflow.
-		return nil, fmt.Errorf("wrong namespace for client %s vs workflow %s", temporalClient.namespace, w.queue.namespace.name)
-	}
 	return temporalClient.Client.ExecuteWorkflow(ctx, opts, w.name, param)
 }
 
@@ -141,7 +134,6 @@ func (w Workflow[Param, Return]) RunChild(ctx workflow.Context, opts workflow.Ch
 // Execute asynchnronously executes the workflow from another parent workflow and returns a promise.
 func (w Workflow[Param, Return]) ExecuteChild(ctx workflow.Context, opts workflow.ChildWorkflowOptions, param Param) workflow.ChildWorkflowFuture {
 	opts.TaskQueue = w.queue.name
-	opts.Namespace = w.queue.namespace.name
 	return workflow.ExecuteChildWorkflow(workflow.WithChildOptions(ctx, opts), w.name, param)
 }
 
@@ -165,10 +157,6 @@ func setSchedule(ctx context.Context, temporalClient *Client, opts client.Schedu
 	a.TaskQueue = queue.name
 	a.Args = args
 	opts.Action = a
-
-	if temporalClient.namespace != queue.namespace.name {
-		return fmt.Errorf("attempting to set a schedule for a workflow in %s on the wrong namespace: %s", queue.namespace.name, temporalClient.namespace)
-	}
 
 	s := temporalClient.Client.ScheduleClient().GetHandle(ctx, opts.ID)
 	info, err := s.Describe(ctx)

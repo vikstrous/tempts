@@ -12,7 +12,7 @@ import (
 	"go.temporal.io/sdk/workflow"
 )
 
-var queueMain = tempts.NewQueue(tempts.DefaultNamespace, "main")
+var queueMain = tempts.NewQueue("main")
 
 var (
 	workflowTypeFormatAndGreet        = tempts.NewWorkflow[string, string](queueMain, "format_and_greet")

@@ -17,11 +17,7 @@ import (
 // GetWorkflowHistoriesBundle connects to the temporal server and fetches the most recent 10 open and 10 closed executions.
 // It returns a byte seralized piece of data that can be used immediately or in the future to call ReplayWorkflow.
 func GetWorkflowHistoriesBundle(ctx context.Context, client *Client, w WorkflowDeclaration) ([]byte, error) {
-	if client.namespace != w.getQueue().namespace.name {
-		return nil, fmt.Errorf("namespace for client %s doesn't match namespace for workflow %s", client.namespace, w.getQueue().namespace.name)
-	}
 	closedExecutions, err := client.Client.WorkflowService().ListClosedWorkflowExecutions(ctx, &workflowservice.ListClosedWorkflowExecutionsRequest{
-		Namespace:       w.getQueue().namespace.name,
 		MaximumPageSize: 10,
 		Filters: &workflowservice.ListClosedWorkflowExecutionsRequest_TypeFilter{
 			TypeFilter: &filter.WorkflowTypeFilter{Name: w.Name()},
@@ -31,7 +27,6 @@ func GetWorkflowHistoriesBundle(ctx context.Context, client *Client, w WorkflowD
 		return nil, fmt.Errorf("failed to get closed executions: %w", err)
 	}
 	openExecutions, err := client.Client.WorkflowService().ListOpenWorkflowExecutions(ctx, &workflowservice.ListOpenWorkflowExecutionsRequest{
-		Namespace:       w.getQueue().namespace.name,
 		MaximumPageSize: 10,
 		Filters: &workflowservice.ListOpenWorkflowExecutionsRequest_TypeFilter{
 			TypeFilter: &filter.WorkflowTypeFilter{Name: w.Name()},
