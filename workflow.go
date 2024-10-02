@@ -193,6 +193,7 @@ func setSchedule(ctx context.Context, temporalClient *Client, opts client.Schedu
 			s := input.Description.Schedule
 			s.Action = opts.Action
 			s.Spec = &opts.Spec
+			s.State.Paused = opts.Paused
 			s.Policy = &client.SchedulePolicies{
 				Overlap:        opts.Overlap,
 				CatchupWindow:  opts.CatchupWindow,
