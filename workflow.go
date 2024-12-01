@@ -80,7 +80,6 @@ func NewWorkflow[
 ](queue *Queue, name string,
 ) Workflow[Param, Return] {
 	panicIfNotStruct[Param]("NewWorkflow")
-	panicIfNotStruct[Return]("NewWorkflow")
 	queue.registerWorkflow(name, (func(context.Context, Param) (Return, error))(nil))
 	return Workflow[Param, Return]{
 		name:  name,
@@ -93,7 +92,6 @@ func NewWorkflow[
 // as a separate positional argument in the order they are defined.
 func NewWorkflowPositional[Param any, Return any](queue *Queue, name string) Workflow[Param, Return] {
 	panicIfNotStruct[Param]("NewWorkflowPositional")
-	panicIfNotStruct[Return]("NewWorkflowPositional")
 
 	// Get the type information for the Param struct
 	paramType := reflect.TypeOf((*Param)(nil)).Elem()
@@ -195,7 +193,7 @@ func (w Workflow[Param, Return]) WithImplementation(fn func(workflow.Context, Pa
 	return &WorkflowWithImpl[Param, Return]{
 		workflowName: w.name,
 		queue:        *w.queue,
-		fn:          wrapper.Interface(),
+		fn:           wrapper.Interface(),
 		positional:   true,
 	}
 }

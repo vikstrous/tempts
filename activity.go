@@ -44,7 +44,6 @@ type Activity[Param, Return any] struct {
 // NewActivity declares the existence of an activity on a given queue with a given name.
 func NewActivity[Param, Return any](q *Queue, name string) Activity[Param, Return] {
 	panicIfNotStruct[Param]("NewActivity")
-	panicIfNotStruct[Return]("NewActivity")
 	q.registerActivity(name, (func(context.Context, Param) (Return, error))(nil))
 	return Activity[Param, Return]{Name: name, queue: q}
 }
@@ -54,7 +53,6 @@ func NewActivity[Param, Return any](q *Queue, name string) Activity[Param, Retur
 // as a separate positional argument in the order they are defined.
 func NewActivityPositional[Param, Return any](q *Queue, name string) Activity[Param, Return] {
 	panicIfNotStruct[Param]("NewActivityPositional")
-	panicIfNotStruct[Return]("NewActivityPositional")
 
 	// Get the type information for the Param struct
 	paramType := reflect.TypeOf((*Param)(nil)).Elem()

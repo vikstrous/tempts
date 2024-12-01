@@ -15,7 +15,6 @@ type QueryHandler[Param, Return any] struct {
 // NewQueryHandler declares the name and types for a query to a workflow.
 func NewQueryHandler[Param, Return any](queryName string) *QueryHandler[Param, Return] {
 	panicIfNotStruct[Param]("NewQuery")
-	panicIfNotStruct[Return]("NewQuery")
 	return &QueryHandler[Param, Return]{name: queryName}
 }
 

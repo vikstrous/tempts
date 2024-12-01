@@ -315,8 +315,6 @@ This is really just the cherry on top once you have your type safety in place. B
 ## Migration for Go SDK users
 
 Since this library is opinionated, it doesn't support all temporal features. To use this library effectively, the temporal queue you are migrating must meet these pre-requisities:
-* All workflows must take at most one parameter and return at most one parameter.
-* All activities must take at most one parameter and return at most one parameter.
 * Queues names must be static (assuming that your types are defined as global variables so they can be used anywhere).
 * All workflows and activities for a given queue must be migrated at once.
 * All types must be defined as Go structs that follow the Temporal Go SDK's marshaling and unmarshaling logic.
