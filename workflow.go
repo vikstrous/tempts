@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 	"time"
 
 	"go.temporal.io/api/serviceerror"
@@ -17,6 +18,7 @@ type WorkflowWithImpl[Param any, Return any] struct {
 	workflowName string
 	queue        Queue
 	fn           any
+	positional   bool
 }
 
 // Name returns the name of the workflow being implemented.
@@ -66,8 +68,9 @@ type WorkflowDeclaration interface {
 // Workflow is used for interacting with workflows in a safe way that takes into account the input and output types, queue name and other properties.
 // Workflows are resumable functions registered on workers that execute activities.
 type Workflow[Param any, Return any] struct {
-	name  string
-	queue *Queue
+	name       string
+	queue      *Queue
+	positional bool
 }
 
 // NewWorkflow declares the existence of a workflow on a given queue with a given name.
@@ -85,6 +88,43 @@ func NewWorkflow[
 	}
 }
 
+// NewWorkflowPositional declares the existence of a workflow on a given queue with a given name.
+// Instead of passing the Param struct directly to the workflow, it passes each field of the struct
+// as a separate positional argument in the order they are defined.
+func NewWorkflowPositional[Param any, Return any](queue *Queue, name string) Workflow[Param, Return] {
+	panicIfNotStruct[Param]("NewWorkflowPositional")
+	panicIfNotStruct[Return]("NewWorkflowPositional")
+
+	// Get the type information for the Param struct
+	paramType := reflect.TypeOf((*Param)(nil)).Elem()
+
+	// Create a slice of function parameter types: (context.Context, field1Type, field2Type, ...)
+	var fieldTypes []reflect.Type
+	if paramType.Kind() == reflect.Ptr {
+		fieldTypes = extractFieldTypes(paramType.Elem())
+	} else {
+		fieldTypes = extractFieldTypes(paramType)
+	}
+
+	paramTypes := make([]reflect.Type, len(fieldTypes)+1)
+	paramTypes[0] = reflect.TypeOf((*workflow.Context)(nil)).Elem()
+	copy(paramTypes[1:], fieldTypes)
+
+	// Create the function type: func(workflow.Context, field1Type, field2Type, ...) (Return, error)
+	returnType := reflect.TypeOf((*Return)(nil)).Elem()
+	errorType := reflect.TypeOf((*error)(nil)).Elem()
+	fnType := reflect.FuncOf(paramTypes, []reflect.Type{returnType, errorType}, false)
+
+	// Register a nil function of the correct type
+	queue.registerWorkflow(name, reflect.Zero(fnType).Interface())
+
+	return Workflow[Param, Return]{
+		name:       name,
+		queue:      queue,
+		positional: true,
+	}
+}
+
 // Name returns the name of the workflow.
 func (w Workflow[Param, Return]) Name() string {
 	return w.name
@@ -97,13 +137,67 @@ func (w Workflow[Param, Return]) getQueue() *Queue {
 
 // WithImplementation should be called to create the parameters for NewWorker(). It declares which function implements the workflow.
 func (w Workflow[Param, Return]) WithImplementation(fn func(workflow.Context, Param) (Return, error)) *WorkflowWithImpl[Param, Return] {
-	return &WorkflowWithImpl[Param, Return]{workflowName: w.name, queue: *w.queue, fn: func(ctx workflow.Context, param Param) (Return, error) {
-		// Set a default timeout so if a workflow doesn't need to customize it, it doesn't have to call this function.
-		ctx = workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
-			StartToCloseTimeout: time.Second * 10,
-		})
-		return fn(ctx, param)
-	}}
+	if !w.positional {
+		return &WorkflowWithImpl[Param, Return]{workflowName: w.name, queue: *w.queue, fn: func(ctx workflow.Context, param Param) (Return, error) {
+			// Set a default timeout so if a workflow doesn't need to customize it, it doesn't have to call this function.
+			ctx = workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
+				StartToCloseTimeout: time.Second * 10,
+			})
+			return fn(ctx, param)
+		}}
+	}
+
+	// For positional workflows, create a wrapper function that converts positional arguments to a struct
+	paramType := reflect.TypeOf((*Param)(nil)).Elem()
+	var fieldTypes []reflect.Type
+	if paramType.Kind() == reflect.Ptr {
+		fieldTypes = extractFieldTypes(paramType.Elem())
+	} else {
+		fieldTypes = extractFieldTypes(paramType)
+	}
+
+	wrapper := reflect.MakeFunc(
+		reflect.FuncOf(
+			append([]reflect.Type{reflect.TypeOf((*workflow.Context)(nil)).Elem()}, fieldTypes...),
+			[]reflect.Type{reflect.TypeOf((*Return)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()},
+			false,
+		),
+		func(args []reflect.Value) []reflect.Value {
+			ctx := args[0]
+
+			// Create a new instance of the Param struct
+			var paramVal reflect.Value
+			if paramType.Kind() == reflect.Ptr {
+				paramVal = reflect.New(paramType.Elem())
+				// Fill the struct fields with the positional arguments
+				for i := 0; i < paramType.Elem().NumField(); i++ {
+					paramVal.Elem().Field(i).Set(args[i+1])
+				}
+			} else {
+				paramVal = reflect.New(paramType).Elem()
+				// Fill the struct fields with the positional arguments
+				for i := 0; i < paramType.NumField(); i++ {
+					paramVal.Field(i).Set(args[i+1])
+				}
+			}
+
+			// Set default timeout
+			ctx = reflect.ValueOf(workflow.WithActivityOptions(ctx.Interface().(workflow.Context), workflow.ActivityOptions{
+				StartToCloseTimeout: time.Second * 10,
+			}))
+
+			// Call the implementation function with the context and constructed struct
+			results := reflect.ValueOf(fn).Call([]reflect.Value{ctx, paramVal})
+			return results
+		},
+	)
+
+	return &WorkflowWithImpl[Param, Return]{
+		workflowName: w.name,
+		queue:        *w.queue,
+		fn:          wrapper.Interface(),
+		positional:   true,
+	}
 }
 
 // Run executes the workflow and synchronously returns the output.
@@ -117,10 +211,25 @@ func (w Workflow[Param, Return]) Run(ctx context.Context, temporalClient *Client
 	return ret, err
 }
 
-// Execute asynchnronously executes the workflow and returns a promise.
+// Execute asynchronously executes the workflow and returns a promise.
 func (w Workflow[Param, Return]) Execute(ctx context.Context, temporalClient *Client, opts client.StartWorkflowOptions, param Param) (client.WorkflowRun, error) {
 	opts.TaskQueue = w.queue.name
-	return temporalClient.Client.ExecuteWorkflow(ctx, opts, w.name, param)
+	if !w.positional {
+		return temporalClient.Client.ExecuteWorkflow(ctx, opts, w.name, param)
+	}
+
+	// For positional workflows, extract struct fields into separate arguments
+	paramVal := reflect.ValueOf(param)
+	if paramVal.Kind() == reflect.Ptr {
+		paramVal = paramVal.Elem()
+	}
+
+	args := make([]interface{}, paramVal.NumField())
+	for i := 0; i < paramVal.NumField(); i++ {
+		args[i] = paramVal.Field(i).Interface()
+	}
+
+	return temporalClient.Client.ExecuteWorkflow(ctx, opts, w.name, args...)
 }
 
 // Run executes the workflow from another parent workflow and synchronously returns the output.
@@ -133,10 +242,25 @@ func (w Workflow[Param, Return]) RunChild(ctx workflow.Context, opts workflow.Ch
 	return ret, nil
 }
 
-// Execute asynchnronously executes the workflow from another parent workflow and returns a promise.
+// Execute asynchronously executes the workflow from another parent workflow and returns a promise.
 func (w Workflow[Param, Return]) ExecuteChild(ctx workflow.Context, opts workflow.ChildWorkflowOptions, param Param) workflow.ChildWorkflowFuture {
 	opts.TaskQueue = w.queue.name
-	return workflow.ExecuteChildWorkflow(workflow.WithChildOptions(ctx, opts), w.name, param)
+	if !w.positional {
+		return workflow.ExecuteChildWorkflow(workflow.WithChildOptions(ctx, opts), w.name, param)
+	}
+
+	// For positional workflows, extract struct fields into separate arguments
+	paramVal := reflect.ValueOf(param)
+	if paramVal.Kind() == reflect.Ptr {
+		paramVal = paramVal.Elem()
+	}
+
+	args := make([]interface{}, paramVal.NumField())
+	for i := 0; i < paramVal.NumField(); i++ {
+		args[i] = paramVal.Field(i).Interface()
+	}
+
+	return workflow.ExecuteChildWorkflow(workflow.WithChildOptions(ctx, opts), w.name, args...)
 }
 
 // SetSchedule creates or updates the schedule to match the given definition.
@@ -144,7 +268,23 @@ func (w Workflow[Param, Return]) ExecuteChild(ctx workflow.Context, opts workflo
 // This feature is not as seamless as it could be because of the complex API exposed by temporal.
 // In some cases, when the schedule has been modified in some non-updateable way, this method can't update the schedule and it returns an error.
 func (w Workflow[Param, Return]) SetSchedule(ctx context.Context, temporalClient *Client, opts client.ScheduleOptions, param Param) error {
-	return setSchedule(ctx, temporalClient, opts, w.name, w.queue, []any{param})
+	// Handle positional arguments
+	var args []any
+	if !w.positional {
+		args = []any{param}
+	} else {
+		// For positional workflows, extract struct fields into separate arguments
+		paramVal := reflect.ValueOf(param)
+		if paramVal.Kind() == reflect.Ptr {
+			paramVal = paramVal.Elem()
+		}
+
+		args = make([]any, paramVal.NumField())
+		for i := 0; i < paramVal.NumField(); i++ {
+			args[i] = paramVal.Field(i).Interface()
+		}
+	}
+	return setSchedule(ctx, temporalClient, opts, w.name, w.queue, args)
 }
 
 func setSchedule(ctx context.Context, temporalClient *Client, opts client.ScheduleOptions, workflowName string, queue *Queue, args []any) error {
