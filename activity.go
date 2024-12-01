@@ -172,6 +172,11 @@ func (a Activity[Param, Return]) Execute(ctx workflow.Context, param Param) work
 	return workflow.ExecuteActivity(workflow.WithTaskQueue(ctx, a.queue.name), a.Name, args...)
 }
 
+// AppendFuture executes the activity and appends the resulting future to the provided slice of futures.
+func (a Activity[Param, Return]) AppendFuture(ctx workflow.Context, futures *[]workflow.Future, param Param) {
+	*futures = append(*futures, a.Execute(ctx, param))
+}
+
 // Run synchronously executes the activity and returns the result.
 func (a Activity[Param, Return]) Run(ctx workflow.Context, param Param) (Return, error) {
 	var result Return
