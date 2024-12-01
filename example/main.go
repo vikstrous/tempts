@@ -14,16 +14,51 @@ import (
 
 var queueMain = tempts.NewQueue("main")
 
-var (
-	workflowTypeFormatAndGreet        = tempts.NewWorkflow[string, string](queueMain, "format_and_greet")
-	workflowTypeFormatAndGreetGetName = tempts.NewQueryHandler[struct{}, string]("get_formatted_name")
-	activityTypeFormatName            = tempts.NewActivity[string, string](queueMain, "format_name")
-)
+type FormatNameParams struct {
+	Name string
+}
 
-var (
-	workflowTypeJustGreet = tempts.NewWorkflow[string, string](queueMain, "greet")
-	activityTypeGreet     = tempts.NewActivity[string, string](queueMain, "greet")
-)
+type FormatNameResult struct {
+	Name string
+}
+
+var activityTypeFormatName = tempts.NewActivity[FormatNameParams, FormatNameResult](queueMain, "format_name")
+
+type FormatAndGreetParams struct {
+	Name string
+}
+
+type FormatAndGreetResult struct {
+	Name string
+}
+
+var workflowTypeFormatAndGreet = tempts.NewWorkflow[FormatAndGreetParams, FormatAndGreetResult](queueMain, "format_and_greet")
+
+type FormatAndGreetGetNameResult struct {
+	Name string
+}
+
+var workflowTypeFormatAndGreetGetName = tempts.NewQueryHandler[struct{}, FormatAndGreetGetNameResult]("get_formatted_name")
+
+type JustGreetParams struct {
+	Name string
+}
+
+type JustGreetResult struct {
+	Name string
+}
+
+var workflowTypeJustGreet = tempts.NewWorkflow[JustGreetParams, JustGreetResult](queueMain, "greet")
+
+type GreetParams struct {
+	Name string
+}
+
+type GreetResult struct {
+	Name string
+}
+
+var activityTypeGreet = tempts.NewActivity[GreetParams, GreetResult](queueMain, "greet")
 
 func main() {
 	c, err := tempts.Dial(client.Options{})
@@ -49,21 +84,22 @@ func main() {
 			panic(err)
 		}
 	}()
-	workflowHandle, err := workflowTypeFormatAndGreet.Execute(ctx, c, client.StartWorkflowOptions{}, "Viktor")
+	workflowHandle, err := workflowTypeFormatAndGreet.Execute(ctx, c, client.StartWorkflowOptions{}, FormatAndGreetParams{Name: "Viktor"})
 	if err != nil {
 		panic(err)
 	}
-	newName, err := workflowTypeFormatAndGreetGetName.Query(ctx, c, workflowHandle.GetID(), workflowHandle.GetRunID(), struct{}{})
+	queryResult, err := workflowTypeFormatAndGreetGetName.Query(ctx, c, workflowHandle.GetID(), workflowHandle.GetRunID(), struct{}{})
 	if err != nil {
 		panic(err)
 	}
-	fmt.Printf("Expecting unknown name from the query: %s\n", newName)
+	fmt.Printf("Expecting unknown name from the query: %s\n", queryResult.Name)
 
-	err = workflowHandle.Get(ctx, &newName)
+	var result FormatAndGreetResult
+	err = workflowHandle.Get(ctx, &result)
 	if err != nil {
 		panic(err)
 	}
-	fmt.Printf("Name returned from the workflow: %s\n", newName)
+	fmt.Printf("Name returned from the workflow: %s\n", result.Name)
 	err = workflowTypeFormatAndGreet.SetSchedule(ctx, c, client.ScheduleOptions{
 		ID: "every5s",
 		Spec: client.ScheduleSpec{
@@ -73,46 +109,49 @@ func main() {
 				},
 			},
 		},
-	}, "Viktor")
+	}, FormatAndGreetParams{Name: "Viktor"})
 	if err != nil {
 		panic(err)
 	}
 	time.Sleep(time.Second * 10)
 }
 
-func activityFormatName(ctx context.Context, input string) (string, error) {
-	return strings.ToUpper(input), nil
+func activityFormatName(ctx context.Context, input FormatNameParams) (FormatNameResult, error) {
+	return FormatNameResult{Name: strings.ToUpper(input.Name)}, nil
 }
 
-func workflowFormatAndGreet(ctx workflow.Context, name string) (string, error) {
+func workflowFormatAndGreet(ctx workflow.Context, params FormatAndGreetParams) (FormatAndGreetResult, error) {
 	newName := "unknown"
-	workflowTypeFormatAndGreetGetName.SetHandler(ctx, func(struct{}) (string, error) {
-		return newName, nil
+	workflowTypeFormatAndGreetGetName.SetHandler(ctx, func(struct{}) (FormatAndGreetGetNameResult, error) {
+		return FormatAndGreetGetNameResult{Name: newName}, nil
 	})
 
 	// Give the example code a chance to read the "unknown" name with the query and update it
 	workflow.Sleep(ctx, time.Second*1)
 
-	newName, err := activityTypeFormatName.Run(ctx, name)
+	formatNameResult, err := activityTypeFormatName.Run(ctx, FormatNameParams{Name: params.Name})
 	if err != nil {
-		return "", err
+		return FormatAndGreetResult{}, fmt.Errorf("failed to format name: %w", err)
 	}
+	newName = formatNameResult.Name
+
 	// Give the caller a chance to do an update
 	workflow.Sleep(ctx, time.Second*1)
 
-	final, err := workflowTypeJustGreet.RunChild(ctx, workflow.ChildWorkflowOptions{}, newName)
+	final, err := workflowTypeJustGreet.RunChild(ctx, workflow.ChildWorkflowOptions{}, JustGreetParams{Name: newName})
 	if err != nil {
-		return "", err
+		return FormatAndGreetResult{}, fmt.Errorf("failed to greet: %w", err)
 	}
 	fmt.Println("final", final)
-	return newName, nil
+	return FormatAndGreetResult{Name: newName}, nil
 }
 
-func workflowJustGreet(ctx workflow.Context, name string) (string, error) {
-	return activityTypeGreet.Run(ctx, name)
+func workflowJustGreet(ctx workflow.Context, params JustGreetParams) (JustGreetResult, error) {
+	name, err := activityTypeGreet.Run(ctx, GreetParams{Name: params.Name})
+	return JustGreetResult{Name: name.Name}, err
 }
 
-func activityGreet(ctx context.Context, name string) (string, error) {
-	fmt.Printf("Hello %s\n", name)
-	return name, nil
+func activityGreet(ctx context.Context, params GreetParams) (GreetResult, error) {
+	fmt.Printf("Hello %s\n", params.Name)
+	return GreetResult{Name: params.Name}, nil
 }

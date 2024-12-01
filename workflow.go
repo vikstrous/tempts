@@ -76,6 +76,8 @@ func NewWorkflow[
 	Return any,
 ](queue *Queue, name string,
 ) Workflow[Param, Return] {
+	panicIfNotStruct[Param]("NewWorkflow")
+	panicIfNotStruct[Return]("NewWorkflow")
 	queue.registerWorkflow(name, (func(context.Context, Param) (Return, error))(nil))
 	return Workflow[Param, Return]{
 		name:  name,

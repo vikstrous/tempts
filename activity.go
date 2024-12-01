@@ -3,6 +3,7 @@ package tempts
 import (
 	"context"
 	"fmt"
+	"reflect"
 
 	"go.temporal.io/sdk/activity"
 	"go.temporal.io/sdk/worker"
@@ -40,8 +41,20 @@ type Activity[Param, Return any] struct {
 
 // NewActivity declares the existence of an activity on a given queue with a given name.
 func NewActivity[Param, Return any](q *Queue, name string) Activity[Param, Return] {
+	panicIfNotStruct[Param]("NewActivity")
+	panicIfNotStruct[Return]("NewActivity")
 	q.registerActivity(name, (func(context.Context, Param) (Return, error))(nil))
 	return Activity[Param, Return]{Name: name, queue: q}
+}
+
+func panicIfNotStruct[Param any](funcName string) {
+	paramType := reflect.TypeOf((*Param)(nil)).Elem()
+	if paramType.Kind() == reflect.Ptr {
+		paramType = paramType.Elem()
+	}
+	if paramType.Kind() != reflect.Struct {
+		panic(fmt.Sprintf("%s requires a struct or pointer to struct type parameter, got %v", funcName, paramType.Kind()))
+	}
 }
 
 // WithImplementation should be called to create the parameters for NewWorker(). It declares which function implements the activity.

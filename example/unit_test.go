@@ -23,11 +23,11 @@ func TestExample(t *testing.T) {
 	we := ts.NewTestWorkflowEnvironment()
 	wrk.Register(we)
 
-	result, err := wf.ExecuteInTest(we, "viktor")
+	result, err := wf.ExecuteInTest(we, FormatAndGreetParams{Name: "viktor"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result != "VIKTOR" {
+	if result.Name != "VIKTOR" {
 		t.Fatal("Expected VIKTOR, got", result)
 	}
 }
