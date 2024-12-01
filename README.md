@@ -321,6 +321,8 @@ Since this library is opinionated, it doesn't support all temporal features. To 
 
 There maybe more restrictions that I'm not aware of yet. Open an issue if any are missed.
 
+To simplify migration, if your workflows and activities don't use a single struct input type, use `NewWorkflowPositional`/`NewActivityPositional`. Don't use these functions in new code.
+
 ## Potential future improvements
 
 * Wrap the APIs for channels and signals
