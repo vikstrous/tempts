@@ -20,6 +20,7 @@ func TestExample(t *testing.T) {
 	}
 
 	ts := testsuite.WorkflowTestSuite{}
+	ts.SetDisableRegistrationAliasing(true)
 	we := ts.NewTestWorkflowEnvironment()
 	wrk.Register(we)
 

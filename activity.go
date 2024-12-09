@@ -44,7 +44,9 @@ type Activity[Param, Return any] struct {
 // NewActivity declares the existence of an activity on a given queue with a given name.
 func NewActivity[Param, Return any](q *Queue, name string) Activity[Param, Return] {
 	panicIfNotStruct[Param]("NewActivity")
-	q.registerActivity(name, (func(context.Context, Param) (Return, error))(nil))
+	q.registerActivity(name, func(ctx context.Context, param Param) (Return, error) {
+		panic(fmt.Sprintf("Activity %s execution not mocked", name))
+	})
 	return Activity[Param, Return]{Name: name, queue: q}
 }
 
@@ -72,8 +74,13 @@ func NewActivityPositional[Param, Return any](q *Queue, name string) Activity[Pa
 	errorType := reflect.TypeOf((*error)(nil)).Elem()
 	fnType := reflect.FuncOf(paramTypes, []reflect.Type{returnType, errorType}, false)
 
-	// Register a nil function of the correct type
-	q.registerActivity(name, reflect.Zero(fnType).Interface())
+	// Create a function that panics with the message "Function execution not mocked"
+	mockFn := reflect.MakeFunc(fnType, func(args []reflect.Value) []reflect.Value {
+		panic(fmt.Sprintf("Activity %s execution not mocked", name))
+	})
+
+	// Register the mock function
+	q.registerActivity(name, mockFn.Interface())
 
 	return Activity[Param, Return]{Name: name, queue: q, positional: true}
 }

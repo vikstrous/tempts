@@ -80,7 +80,9 @@ func NewWorkflow[
 ](queue *Queue, name string,
 ) Workflow[Param, Return] {
 	panicIfNotStruct[Param]("NewWorkflow")
-	queue.registerWorkflow(name, (func(context.Context, Param) (Return, error))(nil))
+	queue.registerWorkflow(name, func(workflow.Context, Param) (Return, error) {
+		panic(fmt.Sprintf("Workflow %s execution not mocked", name))
+	})
 	return Workflow[Param, Return]{
 		name:  name,
 		queue: queue,
@@ -113,8 +115,13 @@ func NewWorkflowPositional[Param any, Return any](queue *Queue, name string) Wor
 	errorType := reflect.TypeOf((*error)(nil)).Elem()
 	fnType := reflect.FuncOf(paramTypes, []reflect.Type{returnType, errorType}, false)
 
-	// Register a nil function of the correct type
-	queue.registerWorkflow(name, reflect.Zero(fnType).Interface())
+	// Create a function that panics with the message "Function execution not mocked"
+	mockFn := reflect.MakeFunc(fnType, func(args []reflect.Value) []reflect.Value {
+		panic(fmt.Sprintf("Workflow %s execution not mocked", name))
+	})
+
+	// Register the mock function
+	queue.registerWorkflow(name, mockFn.Interface())
 
 	return Workflow[Param, Return]{
 		name:       name,
