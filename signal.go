@@ -16,6 +16,9 @@ type WorkflowSignal[WorkflowParam, WorkflowReturn, SignalParam any] struct {
 
 // NewWorkflowSignal declares a signal for a specific workflow.
 // The signal is scoped to this workflow, enabling type-safe SignalWithStart operations.
+//
+// The signalName is used as the Temporal channel name (via workflow.GetSignalChannel)
+// and must match when sending signals from external code.
 func NewWorkflowSignal[SignalParam any, WorkflowParam, WorkflowReturn any](
 	w *Workflow[WorkflowParam, WorkflowReturn],
 	signalName string,
@@ -27,7 +30,7 @@ func NewWorkflowSignal[SignalParam any, WorkflowParam, WorkflowReturn any](
 	}
 }
 
-// Name returns the name of the signal.
+// Name returns the signal name, which is also the underlying Temporal channel name.
 func (s *WorkflowSignal[WP, WR, SP]) Name() string {
 	return s.name
 }
