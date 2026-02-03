@@ -160,11 +160,6 @@ func workflowFormatAndGreet(ctx workflow.Context, params FormatAndGreetParams) (
 		return FormatAndGreetGetNameResult{Name: newName + suffix}, nil
 	})
 
-	// Set up signal handler to update the suffix
-	signalUpdateSuffix.SetHandler(ctx, func(ctx workflow.Context, params UpdateSuffixParams) {
-		suffix = params.Suffix
-	})
-
 	// Give the example code a chance to read the "unknown" name with the query and update it
 	workflow.Sleep(ctx, time.Second*1)
 
@@ -173,6 +168,11 @@ func workflowFormatAndGreet(ctx workflow.Context, params FormatAndGreetParams) (
 		return FormatAndGreetResult{}, fmt.Errorf("failed to format name: %w", err)
 	}
 	newName = formatNameResult.Name
+
+	// Check for signal (non-blocking)
+	if params, ok := signalUpdateSuffix.ReceiveAsync(ctx); ok {
+		suffix = params.Suffix
+	}
 
 	// Give the caller a chance to do an update
 	workflow.Sleep(ctx, time.Second*1)

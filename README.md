@@ -338,17 +338,22 @@ type SignalParamType struct {
 }
 var exampleSignal = tempts.NewWorkflowSignal[SignalParamType](&exampleWorkflowType, "exampleSignal")
 
-// In the workflow - Option 1: SetHandler for simple cases
-exampleSignal.SetHandler(ctx, func(ctx workflow.Context, param SignalParamType) {
-    // handle the signal
-})
+// In the workflow - Option 1: Receive (blocking)
+param := exampleSignal.Receive(ctx)
+// handle param
 
-// In the workflow - Option 2: GetChannel for selector-based handling
-ch := exampleSignal.GetChannel(ctx)
+// In the workflow - Option 2: ReceiveAsync (non-blocking)
+if param, ok := exampleSignal.ReceiveAsync(ctx); ok {
+    // handle param
+}
+
+// In the workflow - Option 3: AddToSelector for multiple signals
 selector := workflow.NewSelector(ctx)
-selector.AddReceive(ch.Raw(), func(c workflow.ReceiveChannel, more bool) {
-    val, _ := ch.Receive(ctx)
-    // handle val
+exampleSignal.AddToSelector(ctx, selector, func(param SignalParamType) {
+    // handle param
+})
+otherSignal.AddToSelector(ctx, selector, func(param OtherParamType) {
+    // handle other signal
 })
 selector.Select(ctx)
 

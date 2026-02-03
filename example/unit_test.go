@@ -66,33 +66,31 @@ func TestSignal(t *testing.T) {
 	}
 }
 
-// Test signal using GetChannel with a selector pattern
-type ChannelTestParams struct{}
-type ChannelTestResult struct {
+// Test signal using AddToSelector
+type SelectorTestParams struct{}
+type SelectorTestResult struct {
 	Value string
 }
 
-var queueChannelTest = tempts.NewQueue("channel_test_queue")
-var workflowChannelTest = tempts.NewWorkflow[ChannelTestParams, ChannelTestResult](queueChannelTest, "channel_test")
-var signalChannelTest = tempts.NewWorkflowSignal[UpdateSuffixParams](&workflowChannelTest, "channel_signal")
+var queueSelectorTest = tempts.NewQueue("selector_test_queue")
+var workflowSelectorTest = tempts.NewWorkflow[SelectorTestParams, SelectorTestResult](queueSelectorTest, "selector_test")
+var signalSelectorTest = tempts.NewWorkflowSignal[UpdateSuffixParams](&workflowSelectorTest, "selector_signal")
 
-func workflowChannelTestImpl(ctx workflow.Context, _ ChannelTestParams) (ChannelTestResult, error) {
-	ch := signalChannelTest.GetChannel(ctx)
+func workflowSelectorTestImpl(ctx workflow.Context, _ SelectorTestParams) (SelectorTestResult, error) {
 	selector := workflow.NewSelector(ctx)
 
 	var received string
-	selector.AddReceive(ch.Raw(), func(c workflow.ReceiveChannel, more bool) {
-		val, _ := ch.Receive(ctx)
-		received = val.Suffix
+	signalSelectorTest.AddToSelector(ctx, selector, func(params UpdateSuffixParams) {
+		received = params.Suffix
 	})
 
 	selector.Select(ctx)
-	return ChannelTestResult{Value: received}, nil
+	return SelectorTestResult{Value: received}, nil
 }
 
-func TestSignalGetChannel(t *testing.T) {
-	wf := workflowChannelTest.WithImplementation(workflowChannelTestImpl)
-	wrk, err := tempts.NewWorker(queueChannelTest, []tempts.Registerable{wf})
+func TestSignalAddToSelector(t *testing.T) {
+	wf := workflowSelectorTest.WithImplementation(workflowSelectorTestImpl)
+	wrk, err := tempts.NewWorker(queueSelectorTest, []tempts.Registerable{wf})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -103,14 +101,54 @@ func TestSignalGetChannel(t *testing.T) {
 	wrk.Register(we)
 
 	we.RegisterDelayedCallback(func() {
-		we.SignalWorkflow(signalChannelTest.Name(), UpdateSuffixParams{Suffix: "channel-works"})
+		we.SignalWorkflow(signalSelectorTest.Name(), UpdateSuffixParams{Suffix: "selector-works"})
 	}, 0)
 
-	result, err := wf.ExecuteInTest(we, ChannelTestParams{})
+	result, err := wf.ExecuteInTest(we, SelectorTestParams{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result.Value != "channel-works" {
-		t.Fatalf("Expected 'channel-works', got %s", result.Value)
+	if result.Value != "selector-works" {
+		t.Fatalf("Expected 'selector-works', got %s", result.Value)
+	}
+}
+
+// Test signal using Receive (blocking)
+type ReceiveTestParams struct{}
+type ReceiveTestResult struct {
+	Value string
+}
+
+var queueReceiveTest = tempts.NewQueue("receive_test_queue")
+var workflowReceiveTest = tempts.NewWorkflow[ReceiveTestParams, ReceiveTestResult](queueReceiveTest, "receive_test")
+var signalReceiveTest = tempts.NewWorkflowSignal[UpdateSuffixParams](&workflowReceiveTest, "receive_signal")
+
+func workflowReceiveTestImpl(ctx workflow.Context, _ ReceiveTestParams) (ReceiveTestResult, error) {
+	params := signalReceiveTest.Receive(ctx)
+	return ReceiveTestResult{Value: params.Suffix}, nil
+}
+
+func TestSignalReceive(t *testing.T) {
+	wf := workflowReceiveTest.WithImplementation(workflowReceiveTestImpl)
+	wrk, err := tempts.NewWorker(queueReceiveTest, []tempts.Registerable{wf})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ts := testsuite.WorkflowTestSuite{}
+	ts.SetDisableRegistrationAliasing(true)
+	we := ts.NewTestWorkflowEnvironment()
+	wrk.Register(we)
+
+	we.RegisterDelayedCallback(func() {
+		we.SignalWorkflow(signalReceiveTest.Name(), UpdateSuffixParams{Suffix: "receive-works"})
+	}, 0)
+
+	result, err := wf.ExecuteInTest(we, ReceiveTestParams{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Value != "receive-works" {
+		t.Fatalf("Expected 'receive-works', got %s", result.Value)
 	}
 }

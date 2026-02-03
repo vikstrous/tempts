@@ -32,25 +32,44 @@ func (s *WorkflowSignal[WP, WR, SP]) Name() string {
 	return s.name
 }
 
-// SetHandler registers a callback function to handle this signal in a workflow.
-// The callback is invoked each time the signal is received.
-func (s *WorkflowSignal[WP, WR, SP]) SetHandler(ctx workflow.Context, fn func(ctx workflow.Context, param SP)) {
+// Receive blocks until a signal is received and returns the typed value.
+// For handling multiple signals, use AddToSelector instead.
+func (s *WorkflowSignal[WP, WR, SP]) Receive(ctx workflow.Context) SP {
 	ch := workflow.GetSignalChannel(ctx, s.name)
-	workflow.Go(ctx, func(ctx workflow.Context) {
-		for {
-			var param SP
-			ch.Receive(ctx, &param)
-			fn(ctx, param)
-		}
-	})
+	var param SP
+	ch.Receive(ctx, &param)
+	return param
 }
 
-// GetChannel returns a typed receive channel for this signal.
-// Use this for selector-based signal handling patterns.
-func (s *WorkflowSignal[WP, WR, SP]) GetChannel(ctx workflow.Context) *ReceiveChannel[SP] {
-	return &ReceiveChannel[SP]{
-		ch: workflow.GetSignalChannel(ctx, s.name),
-	}
+// ReceiveAsync attempts to receive a signal without blocking.
+// Returns the value and whether a value was received.
+// For handling multiple signals, use AddToSelector instead.
+func (s *WorkflowSignal[WP, WR, SP]) ReceiveAsync(ctx workflow.Context) (value SP, ok bool) {
+	ch := workflow.GetSignalChannel(ctx, s.name)
+	ok = ch.ReceiveAsync(&value)
+	return value, ok
+}
+
+// AddToSelector adds this signal to a workflow.Selector with a typed callback.
+// This is the recommended way to handle multiple signals in a select-style pattern.
+//
+// Example:
+//
+//	selector := workflow.NewSelector(ctx)
+//	signal1.AddToSelector(ctx, selector, func(val Signal1Param) {
+//	    // handle signal1
+//	})
+//	signal2.AddToSelector(ctx, selector, func(val Signal2Param) {
+//	    // handle signal2
+//	})
+//	selector.Select(ctx)
+func (s *WorkflowSignal[WP, WR, SP]) AddToSelector(ctx workflow.Context, selector workflow.Selector, fn func(SP)) workflow.Selector {
+	ch := workflow.GetSignalChannel(ctx, s.name)
+	return selector.AddReceive(ch, func(c workflow.ReceiveChannel, more bool) {
+		var param SP
+		c.Receive(ctx, &param)
+		fn(param)
+	})
 }
 
 // Signal sends the signal to an already-running workflow.
@@ -82,42 +101,4 @@ func (s *WorkflowSignal[WP, WR, SP]) SignalWithStart(
 		s.workflow.name,
 		workflowParam,
 	)
-}
-
-// ReceiveChannel is a type-safe wrapper around workflow.ReceiveChannel.
-type ReceiveChannel[T any] struct {
-	ch workflow.ReceiveChannel
-}
-
-// Receive blocks until a signal is received and returns the typed value.
-func (c *ReceiveChannel[T]) Receive(ctx workflow.Context) (T, bool) {
-	var value T
-	more := c.ch.Receive(ctx, &value)
-	return value, more
-}
-
-// ReceiveAsync attempts to receive a signal without blocking.
-// Returns the value, whether a value was received, and whether the channel has more values.
-func (c *ReceiveChannel[T]) ReceiveAsync() (value T, ok bool) {
-	ok = c.ch.ReceiveAsync(&value)
-	return value, ok
-}
-
-// ReceiveAsyncWithMoreFlag attempts to receive a signal without blocking.
-// Returns the value, whether a value was received, and whether the channel has more values.
-func (c *ReceiveChannel[T]) ReceiveAsyncWithMoreFlag() (value T, ok bool, more bool) {
-	ok, more = c.ch.ReceiveAsyncWithMoreFlag(&value)
-	return value, ok, more
-}
-
-// Raw returns the underlying workflow.ReceiveChannel for use with workflow.Selector.
-// Example:
-//
-//	selector := workflow.NewSelector(ctx)
-//	selector.AddReceive(signal.GetChannel(ctx).Raw(), func(c workflow.ReceiveChannel, more bool) {
-//	    value, _ := signal.GetChannel(ctx).Receive(ctx)
-//	    // handle value
-//	})
-func (c *ReceiveChannel[T]) Raw() workflow.ReceiveChannel {
-	return c.ch
 }
