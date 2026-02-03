@@ -342,8 +342,8 @@ var exampleSignal = tempts.NewWorkflowSignal[SignalParamType](&exampleWorkflowTy
 param := exampleSignal.Receive(ctx)
 // handle param
 
-// In the workflow - Option 2: ReceiveAsync (non-blocking)
-if param, ok := exampleSignal.ReceiveAsync(ctx); ok {
+// In the workflow - Option 2: TryReceive (non-blocking)
+if param, ok := exampleSignal.TryReceive(ctx); ok {
     // handle param
 }
 

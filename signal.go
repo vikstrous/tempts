@@ -41,10 +41,10 @@ func (s *WorkflowSignal[WP, WR, SP]) Receive(ctx workflow.Context) SP {
 	return param
 }
 
-// ReceiveAsync attempts to receive a signal without blocking.
+// TryReceive attempts to receive a signal without blocking.
 // Returns the value and whether a value was received.
 // For handling multiple signals, use AddToSelector instead.
-func (s *WorkflowSignal[WP, WR, SP]) ReceiveAsync(ctx workflow.Context) (value SP, ok bool) {
+func (s *WorkflowSignal[WP, WR, SP]) TryReceive(ctx workflow.Context) (value SP, ok bool) {
 	ch := workflow.GetSignalChannel(ctx, s.name)
 	ok = ch.ReceiveAsync(&value)
 	return value, ok

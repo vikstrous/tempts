@@ -170,7 +170,7 @@ func workflowFormatAndGreet(ctx workflow.Context, params FormatAndGreetParams) (
 	newName = formatNameResult.Name
 
 	// Check for signal (non-blocking)
-	if params, ok := signalUpdateSuffix.ReceiveAsync(ctx); ok {
+	if params, ok := signalUpdateSuffix.TryReceive(ctx); ok {
 		suffix = params.Suffix
 	}
 
