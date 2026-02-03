@@ -127,6 +127,14 @@ Signals:
 * Are received with the right parameter types
 * SignalWithStart ensures both workflow and signal parameter types are correct
 
+Nexus Operations:
+
+* Are declared on a specific service
+* Are called with the right parameter types
+* Return the right response types
+* Registered handlers match the right type signature
+* All declared operations must have implementations (validated at service creation)
+
 ### Tools
 
 There are two functions in this library that make it easy to write fixture based replyabaility tests for your tempts workflows and activities.
@@ -379,6 +387,77 @@ This ensures that:
 * The workflow parameter type is correct for the workflow
 * The signal parameter type is correct for the signal
 * The signal is scoped to the correct workflow
+
+### Define and implement Nexus operations
+
+Instead of:
+```go
+// Define operations manually
+echoOp := nexus.NewSyncOperation("echo", func(ctx context.Context, input EchoInput, opts nexus.StartOperationOptions) (EchoOutput, error) {
+    return EchoOutput{Message: input.Message}, nil
+})
+
+processOp := temporalnexus.NewWorkflowRunOperation("process", processWorkflow, getOptions)
+
+// Create service and register
+service := nexus.NewService("my-service")
+service.Register(echoOp, processOp)
+worker.RegisterNexusService(service)
+```
+Do:
+```go
+// Globally define the service and operations (in a shared API package)
+var myService = tempts.NewService("my-service")
+
+type EchoInput struct { Message string }
+type EchoOutput struct { Message string }
+var echoOp = tempts.NewSyncOperation[EchoInput, EchoOutput](myService, "echo")
+
+type ProcessInput struct { Data string }
+type ProcessOutput struct { Result string }
+var processOp = tempts.NewAsyncOperation[ProcessInput, ProcessOutput](myService, "process")
+
+// In your handler package, create the service with implementations
+svc, err := myService.WithImplementations(
+    echoOp.WithImplementation(func(ctx context.Context, input EchoInput, opts nexus.StartOperationOptions) (EchoOutput, error) {
+        return EchoOutput{Message: input.Message}, nil
+    }),
+    processOp.WithImplementation(processWorkflow, func(ctx context.Context, input ProcessInput, opts nexus.StartOperationOptions) (client.StartWorkflowOptions, error) {
+        return client.StartWorkflowOptions{ID: "process-" + opts.RequestID}, nil
+    }),
+)
+
+// Create worker with the Nexus service
+wrk, err := tempts.NewWorker(queueMain, registerables, svc)
+```
+
+This ensures that all declared operations have implementations and no extra implementations are provided.
+
+### Call Nexus operations from a workflow
+
+Instead of:
+```go
+c := workflow.NewNexusClient("my-endpoint", "my-service")
+future := c.ExecuteOperation(ctx, "echo", input, workflow.NexusOperationOptions{})
+var result EchoOutput
+err := future.Get(ctx, &result)
+```
+Do:
+```go
+// Using the globally defined service and operations
+c := myService.NewClient(ctx, "my-endpoint")
+
+// Synchronous call
+result, err := echoOp.Run(ctx, c, EchoInput{Message: "hello"}, workflow.NexusOperationOptions{})
+
+// Or async call
+future := echoOp.Execute(ctx, c, EchoInput{Message: "hello"}, workflow.NexusOperationOptions{})
+// ... do other work ...
+var result EchoOutput
+err := future.Get(ctx, &result)
+```
+
+This ensures that the operation is called with the correct parameter type and returns the correct result type.
 
 ## Migration for Go SDK users
 
