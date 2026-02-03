@@ -40,6 +40,13 @@ type FormatAndGreetGetNameResult struct {
 
 var workflowTypeFormatAndGreetGetName = tempts.NewQueryHandler[struct{}, FormatAndGreetGetNameResult]("get_formatted_name")
 
+// Signal to update the greeting suffix while the workflow is running
+type UpdateSuffixParams struct {
+	Suffix string
+}
+
+var signalUpdateSuffix = tempts.NewWorkflowSignal[UpdateSuffixParams](&workflowTypeFormatAndGreet, "update_suffix")
+
 type JustGreetParams struct {
 	Name string
 }
@@ -94,12 +101,37 @@ func main() {
 	}
 	fmt.Printf("Expecting unknown name from the query: %s\n", queryResult.Name)
 
+	// Send a signal to update the suffix while the workflow is running
+	err = signalUpdateSuffix.Signal(ctx, c, workflowHandle.GetID(), workflowHandle.GetRunID(), UpdateSuffixParams{Suffix: "!"})
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println("Signal sent to update suffix")
+
 	var result FormatAndGreetResult
 	err = workflowHandle.Get(ctx, &result)
 	if err != nil {
 		panic(err)
 	}
 	fmt.Printf("Name returned from the workflow: %s\n", result.Name)
+
+	// Demonstrate SignalWithStart - atomically starts workflow or signals existing one
+	signalWithStartHandle, err := signalUpdateSuffix.SignalWithStart(
+		ctx, c,
+		client.StartWorkflowOptions{ID: "signal-with-start-example"},
+		FormatAndGreetParams{Name: "SignalWithStart"},  // workflow param - type checked!
+		UpdateSuffixParams{Suffix: " (started)"},       // signal param - type checked!
+	)
+	if err != nil {
+		panic(err)
+	}
+	var signalWithStartResult FormatAndGreetResult
+	err = signalWithStartHandle.Get(ctx, &signalWithStartResult)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Printf("SignalWithStart workflow result: %s\n", signalWithStartResult.Name)
+
 	err = workflowTypeFormatAndGreet.SetSchedule(ctx, c, client.ScheduleOptions{
 		ID: "every5s",
 		Spec: client.ScheduleSpec{
@@ -122,8 +154,10 @@ func activityFormatName(ctx context.Context, input FormatNameParams) (FormatName
 
 func workflowFormatAndGreet(ctx workflow.Context, params FormatAndGreetParams) (FormatAndGreetResult, error) {
 	newName := "unknown"
+	suffix := ""
+
 	workflowTypeFormatAndGreetGetName.SetHandler(ctx, func(struct{}) (FormatAndGreetGetNameResult, error) {
-		return FormatAndGreetGetNameResult{Name: newName}, nil
+		return FormatAndGreetGetNameResult{Name: newName + suffix}, nil
 	})
 
 	// Give the example code a chance to read the "unknown" name with the query and update it
@@ -135,15 +169,20 @@ func workflowFormatAndGreet(ctx workflow.Context, params FormatAndGreetParams) (
 	}
 	newName = formatNameResult.Name
 
+	// Check for signal (non-blocking)
+	if params, ok := signalUpdateSuffix.TryReceive(ctx); ok {
+		suffix = params.Suffix
+	}
+
 	// Give the caller a chance to do an update
 	workflow.Sleep(ctx, time.Second*1)
 
-	final, err := workflowTypeJustGreet.RunChild(ctx, workflow.ChildWorkflowOptions{}, JustGreetParams{Name: newName})
+	final, err := workflowTypeJustGreet.RunChild(ctx, workflow.ChildWorkflowOptions{}, JustGreetParams{Name: newName + suffix})
 	if err != nil {
 		return FormatAndGreetResult{}, fmt.Errorf("failed to greet: %w", err)
 	}
 	fmt.Println("final", final)
-	return FormatAndGreetResult{Name: newName}, nil
+	return FormatAndGreetResult{Name: newName + suffix}, nil
 }
 
 func workflowJustGreet(ctx workflow.Context, params JustGreetParams) (JustGreetResult, error) {

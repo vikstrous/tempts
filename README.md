@@ -121,6 +121,12 @@ Queries and updates:
 * Return the right types
 * Registered functions match the right type signature
 
+Signals:
+
+* Are sent with the right parameter types
+* Are received with the right parameter types
+* SignalWithStart ensures both workflow and signal parameter types are correct
+
 ### Tools
 
 There are two functions in this library that make it easy to write fixture based replyabaility tests for your tempts workflows and activities.
@@ -312,6 +318,68 @@ if err != nil {
 
 This is really just the cherry on top once you have your type safety in place. By running fixture based tests, you can make sure to not introduce backwards incompatible changes without versioning them correctly. Even if you don't end up using this package, feel free to adapt this pattern for your own needs. It's not a lot of code for how much extra safety it provides.
 
+### Send a signal to a workflow
+
+Instead of:
+```go
+// In the workflow
+ch := workflow.GetSignalChannel(ctx, signalName)
+var param SignalParamType
+ch.Receive(ctx, &param)
+
+// Sending a signal from your application
+err := c.SignalWorkflow(ctx, workflowID, runID, signalName, param)
+```
+Do:
+```go
+// Globally define the signal type, scoped to a workflow
+type SignalParamType struct {
+    Message string
+}
+var exampleSignal = tempts.NewWorkflowSignal[SignalParamType](&exampleWorkflowType, "exampleSignal")
+
+// In the workflow - Option 1: Receive (blocking)
+param := exampleSignal.Receive(ctx)
+// handle param
+
+// In the workflow - Option 2: TryReceive (non-blocking)
+if param, ok := exampleSignal.TryReceive(ctx); ok {
+    // handle param
+}
+
+// In the workflow - Option 3: AddToSelector for multiple signals
+selector := workflow.NewSelector(ctx)
+exampleSignal.AddToSelector(ctx, selector, func(param SignalParamType) {
+    // handle param
+})
+otherSignal.AddToSelector(ctx, selector, func(param OtherParamType) {
+    // handle other signal
+})
+selector.Select(ctx)
+
+// Sending a signal from your application
+err := exampleSignal.Signal(ctx, c, workflowID, runID, SignalParamType{Message: "hello"})
+```
+
+This ensures that the signal parameter type matches between the sender and receiver.
+
+### SignalWithStart a workflow
+
+Instead of:
+```go
+_, err := c.SignalWithStartWorkflow(ctx, workflowID, signalName, signalParam, opts, workflowName, workflowParam)
+```
+Do:
+```go
+// Using the signal defined above
+run, err := exampleSignal.SignalWithStart(ctx, c, opts, workflowParam, signalParam)
+```
+
+This ensures that:
+* The workflow parameter type is correct for the workflow
+* The signal parameter type is correct for the signal
+* The signal is scoped to the correct workflow
+
 ## Migration for Go SDK users
 
 Since this library is opinionated, it doesn't support all temporal features. To use this library effectively, the temporal queue you are migrating must meet these pre-requisities:
@@ -325,6 +393,5 @@ To simplify migration, if your workflows and activities don't use a single struc
 
 ## Potential future improvements
 
-* Wrap the APIs for channels and signals
 * Return typed futures instead of generic ones
-* Ensure that all queries are defined on the right workflows
+* Ensure that all queries and signals are defined on the right workflows
