@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/vikstrous/tempts"
 	"go.temporal.io/sdk/client"
@@ -33,7 +34,8 @@ func testReplayability(t *testing.T, workflowDeclaration tempts.WorkflowDeclarat
 		if err != nil {
 			t.Fatal(err)
 		}
-		historiesData, err = tempts.GetWorkflowHistoriesBundle(ctx, c, workflowDeclaration)
+		maxAge := 90 * 24 * time.Hour
+		historiesData, err = tempts.GetWorkflowHistoriesBundle(ctx, c, workflowDeclaration, &maxAge)
 		if err != nil {
 			t.Fatal(err)
 		}
