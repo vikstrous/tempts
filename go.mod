@@ -1,9 +1,11 @@
 module github.com/vikstrous/tempts
 
+// TODO: Upgrade to go 1.25 for testing/synctest, sync.WaitGroup.Go(), t.Context(), maps.Keys(), reflect.TypeAssert
 go 1.22.0
 
 require (
 	github.com/gogo/protobuf v1.3.2
+	github.com/stretchr/testify v1.8.4
 	go.temporal.io/api v1.24.0
 	go.temporal.io/sdk v1.25.1
 )
@@ -22,7 +24,6 @@ require (
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/robfig/cron v1.2.0 // indirect
 	github.com/stretchr/objx v0.5.0 // indirect
-	github.com/stretchr/testify v1.8.4 // indirect
 	go.uber.org/atomic v1.9.0 // indirect
 	golang.org/x/net v0.14.0 // indirect
 	golang.org/x/sys v0.11.0 // indirect

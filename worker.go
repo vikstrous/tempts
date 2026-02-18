@@ -77,16 +77,19 @@ func (w *Worker) Register(wrk worker.Registry) {
 }
 
 // Run starts the worker. To stop it, cancel the context. This function returns when the worker completes.
-// Make sure to always cancel the context eventually, or a goroutine will be leaked.
 func (w *Worker) Run(ctx context.Context, client *Client, options worker.Options) error {
 	options.DisableRegistrationAliasing = true
 	wrk := worker.New(client.Client, w.queue.name, options)
 	w.Register(wrk)
-
+	done := make(chan struct{})
 	go func() {
-		// There's no way to pass the channel from ctx.Done directly into Run because it's of the wrong type.
-		<-ctx.Done()
-		wrk.Stop()
+		select {
+		case <-ctx.Done():
+			wrk.Stop()
+		case <-done:
+		}
 	}()
-	return wrk.Run(nil)
+	err := wrk.Run(nil)
+	close(done)
+	return err
 }

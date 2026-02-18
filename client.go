@@ -1,8 +1,12 @@
 package tempts
 
-import "go.temporal.io/sdk/client"
+import (
+	"fmt"
 
-// Client is a wrapper for the temporal SDK client that keeps track of which namepace the client is connected to to return more useful errors if the wrong namespace is used.
+	"go.temporal.io/sdk/client"
+)
+
+// Client is a wrapper for the temporal SDK client that keeps track of which namespace the client is connected to to return more useful errors if the wrong namespace is used.
 type Client struct {
 	namespace string
 	Client    client.Client
@@ -39,8 +43,11 @@ func Dial(opts client.Options) (*Client, error) {
 	return &Client{Client: c, namespace: namespace}, nil
 }
 
-// NewFromSDK allows the caller to pass in an existing temporal SDK client and manually specify which name that client was connected to.
+// NewFromSDK allows the caller to pass in an existing temporal SDK client and manually specify which namespace that client was connected to.
 func NewFromSDK(c client.Client, namespace string) (*Client, error) {
+	if c == nil {
+		return nil, fmt.Errorf("client must not be nil")
+	}
 	if namespace == "" {
 		namespace = client.DefaultNamespace
 	}

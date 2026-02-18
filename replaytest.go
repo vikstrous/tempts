@@ -41,7 +41,6 @@ func GetWorkflowHistoriesBundle(ctx context.Context, client *Client, w WorkflowD
 	hists := []*history.History{}
 	for _, e := range allExecutions {
 		var hist history.History
-		fmt.Println(e.Execution)
 		iter := client.Client.GetWorkflowHistory(ctx, e.Execution.WorkflowId, e.Execution.RunId, false, enums.HISTORY_EVENT_FILTER_TYPE_ALL_EVENT)
 		for iter.HasNext() {
 			event, err := iter.Next()
@@ -63,7 +62,7 @@ func GetWorkflowHistoriesBundle(ctx context.Context, client *Client, w WorkflowD
 		}
 		hBytes, err := proto.Marshal(h)
 		if err != nil {
-			return nil, fmt.Errorf("failed to marshal history: %s", err)
+			return nil, fmt.Errorf("failed to marshal history: %w", err)
 		}
 		historiesData.Histories = append(historiesData.Histories, historyWithMetadata{
 			WorkflowID:   allExecutions[i].Execution.WorkflowId,

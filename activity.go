@@ -27,7 +27,7 @@ func (a ActivityWithImpl) validate(q *Queue, v *validationState) error {
 	}
 	_, ok := v.activitiesValidated[a.activityName]
 	if ok {
-		return fmt.Errorf("duplicate activtity name %s for queue %s", a.activityName, q.name)
+		return fmt.Errorf("duplicate activity name %s for queue %s", a.activityName, q.name)
 	}
 	v.activitiesValidated[a.activityName] = struct{}{}
 	return nil
@@ -43,9 +43,11 @@ type Activity[Param, Return any] struct {
 
 // NewActivity declares the existence of an activity on a given queue with a given name.
 func NewActivity[Param, Return any](q *Queue, name string) Activity[Param, Return] {
+	validateName(name)
 	panicIfNotStruct[Param]("NewActivity")
-	q.registerActivity(name, func(ctx context.Context, param Param) (Return, error) {
-		panic(fmt.Sprintf("Activity %s execution not mocked", name))
+	q.registerActivity(name, func(_ context.Context, _ Param) (Return, error) {
+		var zero Return
+		return zero, fmt.Errorf("Activity %s execution not mocked", name)
 	})
 	return Activity[Param, Return]{Name: name, queue: q}
 }
@@ -54,6 +56,7 @@ func NewActivity[Param, Return any](q *Queue, name string) Activity[Param, Retur
 // Instead of passing the Param struct directly to the activity, it passes each field of the struct
 // as a separate positional argument in the order they are defined.
 func NewActivityPositional[Param, Return any](q *Queue, name string) Activity[Param, Return] {
+	validateName(name)
 	panicIfNotStruct[Param]("NewActivityPositional")
 
 	// Get the type information for the Param struct
@@ -74,9 +77,11 @@ func NewActivityPositional[Param, Return any](q *Queue, name string) Activity[Pa
 	errorType := reflect.TypeOf((*error)(nil)).Elem()
 	fnType := reflect.FuncOf(paramTypes, []reflect.Type{returnType, errorType}, false)
 
-	// Create a function that panics with the message "Function execution not mocked"
+	// Create a function that returns an error instead of panicking
 	mockFn := reflect.MakeFunc(fnType, func(args []reflect.Value) []reflect.Value {
-		panic(fmt.Sprintf("Activity %s execution not mocked", name))
+		zero := reflect.New(returnType).Elem()
+		errVal := reflect.ValueOf(fmt.Errorf("Activity %s execution not mocked", name))
+		return []reflect.Value{zero, errVal}
 	})
 
 	// Register the mock function
@@ -85,6 +90,12 @@ func NewActivityPositional[Param, Return any](q *Queue, name string) Activity[Pa
 	return Activity[Param, Return]{Name: name, queue: q, positional: true}
 }
 
+// panicIfNotStruct enforces that the Param type parameter is a struct (or *struct).
+//
+// Why panic: Go's generics cannot express a "must be struct" constraint, so this
+// is a runtime enforcement of a compile-time invariant. It fires during package
+// init (these constructors are called in var declarations), never at request time.
+// If Go adds structural type constraints, this function becomes unnecessary.
 func panicIfNotStruct[Param any](funcName string) {
 	paramType := reflect.TypeOf((*Param)(nil)).Elem()
 	if paramType.Kind() == reflect.Ptr {
@@ -95,6 +106,12 @@ func panicIfNotStruct[Param any](funcName string) {
 	}
 }
 
+// extractFieldTypes returns the types of all exported fields in a struct type.
+//
+// Why panic: This is a defensive assertion in an internal helper. It is only
+// reachable if the caller bypasses panicIfNotStruct, which is a programming
+// error internal to this package. Returning an error here would propagate
+// complexity to every call site for a condition that cannot occur in correct code.
 func extractFieldTypes(structType reflect.Type) []reflect.Type {
 	if structType.Kind() == reflect.Ptr {
 		structType = structType.Elem()

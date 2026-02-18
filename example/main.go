@@ -156,6 +156,10 @@ func workflowFormatAndGreet(ctx workflow.Context, params FormatAndGreetParams) (
 	newName := "unknown"
 	suffix := ""
 
+	ctx = workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
+		StartToCloseTimeout: time.Second * 10,
+	})
+
 	workflowTypeFormatAndGreetGetName.SetHandler(ctx, func(struct{}) (FormatAndGreetGetNameResult, error) {
 		return FormatAndGreetGetNameResult{Name: newName + suffix}, nil
 	})
@@ -186,6 +190,9 @@ func workflowFormatAndGreet(ctx workflow.Context, params FormatAndGreetParams) (
 }
 
 func workflowJustGreet(ctx workflow.Context, params JustGreetParams) (JustGreetResult, error) {
+	ctx = workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
+		StartToCloseTimeout: time.Second * 10,
+	})
 	name, err := activityTypeGreet.Run(ctx, GreetParams{Name: params.Name})
 	return JustGreetResult{Name: name.Name}, err
 }

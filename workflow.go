@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
-	"time"
 
 	"go.temporal.io/api/serviceerror"
 	"go.temporal.io/sdk/client"
@@ -16,7 +15,7 @@ import (
 // WorkflowWithImpl is a temporary struct that implements Registerable. It's meant to be passed into `tempts.NewWorker`.
 type WorkflowWithImpl[Param any, Return any] struct {
 	workflowName string
-	queue        Queue
+	queue        *Queue
 	fn           any
 	positional   bool
 }
@@ -36,7 +35,7 @@ func (w WorkflowWithImpl[Param, Return]) validate(q *Queue, v *validationState) 
 	}
 	_, ok := v.workflowsValidated[w.workflowName]
 	if ok {
-		return fmt.Errorf("duplicate activtity name %s for queue %s", w.workflowName, q.name)
+		return fmt.Errorf("duplicate workflow name %s for queue %s", w.workflowName, q.name)
 	}
 	v.workflowsValidated[w.workflowName] = struct{}{}
 	return nil
@@ -79,9 +78,11 @@ func NewWorkflow[
 	Return any,
 ](queue *Queue, name string,
 ) Workflow[Param, Return] {
+	validateName(name)
 	panicIfNotStruct[Param]("NewWorkflow")
-	queue.registerWorkflow(name, func(workflow.Context, Param) (Return, error) {
-		panic(fmt.Sprintf("Workflow %s execution not mocked", name))
+	queue.registerWorkflow(name, func(_ workflow.Context, _ Param) (Return, error) {
+		var zero Return
+		return zero, fmt.Errorf("Workflow %s execution not mocked", name)
 	})
 	return Workflow[Param, Return]{
 		name:  name,
@@ -93,6 +94,7 @@ func NewWorkflow[
 // Instead of passing the Param struct directly to the workflow, it passes each field of the struct
 // as a separate positional argument in the order they are defined.
 func NewWorkflowPositional[Param any, Return any](queue *Queue, name string) Workflow[Param, Return] {
+	validateName(name)
 	panicIfNotStruct[Param]("NewWorkflowPositional")
 
 	// Get the type information for the Param struct
@@ -115,9 +117,11 @@ func NewWorkflowPositional[Param any, Return any](queue *Queue, name string) Wor
 	errorType := reflect.TypeOf((*error)(nil)).Elem()
 	fnType := reflect.FuncOf(paramTypes, []reflect.Type{returnType, errorType}, false)
 
-	// Create a function that panics with the message "Function execution not mocked"
+	// Create a function that returns an error instead of panicking
 	mockFn := reflect.MakeFunc(fnType, func(args []reflect.Value) []reflect.Value {
-		panic(fmt.Sprintf("Workflow %s execution not mocked", name))
+		zero := reflect.New(returnType).Elem()
+		errVal := reflect.ValueOf(fmt.Errorf("Workflow %s execution not mocked", name))
+		return []reflect.Value{zero, errVal}
 	})
 
 	// Register the mock function
@@ -143,13 +147,7 @@ func (w Workflow[Param, Return]) getQueue() *Queue {
 // WithImplementation should be called to create the parameters for NewWorker(). It declares which function implements the workflow.
 func (w Workflow[Param, Return]) WithImplementation(fn func(workflow.Context, Param) (Return, error)) *WorkflowWithImpl[Param, Return] {
 	if !w.positional {
-		return &WorkflowWithImpl[Param, Return]{workflowName: w.name, queue: *w.queue, fn: func(ctx workflow.Context, param Param) (Return, error) {
-			// Set a default timeout so if a workflow doesn't need to customize it, it doesn't have to call this function.
-			ctx = workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
-				StartToCloseTimeout: time.Second * 10,
-			})
-			return fn(ctx, param)
-		}}
+		return &WorkflowWithImpl[Param, Return]{workflowName: w.name, queue: w.queue, fn: fn}
 	}
 
 	// For positional workflows, create a wrapper function that converts positional arguments to a struct
@@ -186,11 +184,6 @@ func (w Workflow[Param, Return]) WithImplementation(fn func(workflow.Context, Pa
 				}
 			}
 
-			// Set default timeout
-			ctx = reflect.ValueOf(workflow.WithActivityOptions(ctx.Interface().(workflow.Context), workflow.ActivityOptions{
-				StartToCloseTimeout: time.Second * 10,
-			}))
-
 			// Call the implementation function with the context and constructed struct
 			results := reflect.ValueOf(fn).Call([]reflect.Value{ctx, paramVal})
 			return results
@@ -199,7 +192,7 @@ func (w Workflow[Param, Return]) WithImplementation(fn func(workflow.Context, Pa
 
 	return &WorkflowWithImpl[Param, Return]{
 		workflowName: w.name,
-		queue:        *w.queue,
+		queue:        w.queue,
 		fn:           wrapper.Interface(),
 		positional:   true,
 	}

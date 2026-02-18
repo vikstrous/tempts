@@ -23,6 +23,7 @@ func NewWorkflowSignal[SignalParam any, WorkflowParam, WorkflowReturn any](
 	w *Workflow[WorkflowParam, WorkflowReturn],
 	signalName string,
 ) *WorkflowSignal[WorkflowParam, WorkflowReturn, SignalParam] {
+	validateName(signalName)
 	panicIfNotStruct[SignalParam]("NewWorkflowSignal")
 	return &WorkflowSignal[WorkflowParam, WorkflowReturn, SignalParam]{
 		workflow: w,
