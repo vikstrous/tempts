@@ -148,7 +148,9 @@ func (w Workflow[Param, Return]) WithImplementation(fn func(workflow.Context, Pa
 			ctx = workflow.WithActivityOptions(ctx, workflow.ActivityOptions{
 				StartToCloseTimeout: time.Second * 10,
 			})
-			return fn(ctx, param)
+			ret, err := fn(ctx, param)
+			panicOnDecodeError(err)
+			return ret, err
 		}}
 	}
 
@@ -193,6 +195,12 @@ func (w Workflow[Param, Return]) WithImplementation(fn func(workflow.Context, Pa
 
 			// Call the implementation function with the context and constructed struct
 			results := reflect.ValueOf(fn).Call([]reflect.Value{ctx, paramVal})
+			// Check if the error result (index 1) is a DecodeError and panic if so
+			if errVal := results[1]; !errVal.IsNil() {
+				if err, ok := errVal.Interface().(error); ok {
+					panicOnDecodeError(err)
+				}
+			}
 			return results
 		},
 	)
@@ -242,6 +250,9 @@ func (w Workflow[Param, Return]) RunChild(ctx workflow.Context, opts workflow.Ch
 	var ret Return
 	err := w.ExecuteChild(ctx, opts, param).Get(ctx, &ret)
 	if err != nil {
+		if isChildWorkflowDecodeError(err) {
+			return ret, &DecodeError{err: err}
+		}
 		return ret, err
 	}
 	return ret, nil
