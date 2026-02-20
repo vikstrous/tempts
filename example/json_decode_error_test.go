@@ -79,8 +79,8 @@ func activityBrokenJSON(ctx context.Context, params BrokenJSONParams) (BrokenJSO
 }
 
 // workflowBrokenJSON is a plain workflow — no special panic handling.
-// tempts' WithImplementation wrapper detects the DecodeError and panics
-// outside this function's scope.
+// tempts' WithImplementation wrapper detects converter.ErrUnableToDecode
+// in the error chain and panics outside this function's scope.
 func workflowBrokenJSON(ctx workflow.Context, params BrokenJSONWorkflowParams) (BrokenJSONWorkflowResult, error) {
 	result, err := activityTypeBrokenJSON.Run(ctx, BrokenJSONParams{Input: params.Input})
 	if err != nil {
@@ -145,7 +145,7 @@ func TestDecodeErrorCausesPanic(t *testing.T) {
 }
 
 // TestNormalActivityErrorNotTreatedAsDecodeError verifies that a real activity
-// failure (returning an error from the activity) is NOT wrapped as a DecodeError.
+// failure (returning an error from the activity) is NOT treated as a decode error.
 type FailingActivityParams struct {
 	Input string
 }

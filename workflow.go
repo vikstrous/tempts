@@ -195,7 +195,7 @@ func (w Workflow[Param, Return]) WithImplementation(fn func(workflow.Context, Pa
 
 			// Call the implementation function with the context and constructed struct
 			results := reflect.ValueOf(fn).Call([]reflect.Value{ctx, paramVal})
-			// Check if the error result (index 1) is a DecodeError and panic if so
+			// Check if the error result (index 1) is a decode error and panic if so
 			if errVal := results[1]; !errVal.IsNil() {
 				if err, ok := errVal.Interface().(error); ok {
 					panicOnDecodeError(err)
@@ -249,13 +249,7 @@ func (w Workflow[Param, Return]) Execute(ctx context.Context, temporalClient *Cl
 func (w Workflow[Param, Return]) RunChild(ctx workflow.Context, opts workflow.ChildWorkflowOptions, param Param) (Return, error) {
 	var ret Return
 	err := w.ExecuteChild(ctx, opts, param).Get(ctx, &ret)
-	if err != nil {
-		if isDecodeError(err) {
-			return ret, &DecodeError{err: err}
-		}
-		return ret, err
-	}
-	return ret, nil
+	return ret, err
 }
 
 // Execute asynchronously executes the workflow from another parent workflow and returns a promise.
