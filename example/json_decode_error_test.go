@@ -128,9 +128,14 @@ func TestDecodeErrorCausesPanic(t *testing.T) {
 		t.Fatalf("expected PanicError, got: %T: %v", err, err)
 	}
 
-	// Verify the panic message contains the decode error context
+	// Verify the panic message contains the decode error context.
+	// "unable to decode" comes from converter.ErrUnableToDecode, the sentinel
+	// that all Temporal payload converters wrap when deserialization fails.
 	if !strings.Contains(panicErr.Error(), "payload decode error") {
 		t.Fatalf("expected panic message to contain 'payload decode error', got: %s", panicErr.Error())
+	}
+	if !strings.Contains(panicErr.Error(), "unable to decode") {
+		t.Fatalf("expected panic message to contain 'unable to decode' (converter.ErrUnableToDecode sentinel), got: %s", panicErr.Error())
 	}
 	if !strings.Contains(panicErr.Error(), "intentional JSON decode error") {
 		t.Fatalf("expected panic message to contain 'intentional JSON decode error', got: %s", panicErr.Error())
