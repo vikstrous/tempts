@@ -9,9 +9,23 @@ import (
 
 	"go.temporal.io/api/serviceerror"
 	"go.temporal.io/sdk/client"
+	"go.temporal.io/sdk/converter"
 	"go.temporal.io/sdk/worker"
 	"go.temporal.io/sdk/workflow"
 )
+
+// panicOnDecodeError panics if the error wraps converter.ErrUnableToDecode,
+// the sentinel used by all Temporal payload converters (JSON, proto, proto-JSON)
+// when deserialization fails. This is called from the WithImplementation wrapper,
+// which runs outside the user's workflow function scope. A panic here causes a
+// workflow task failure (not a workflow execution failure), matching the behavior
+// of non-determinism errors: the workflow stays open and the task is retried
+// until a fixed worker is deployed.
+func panicOnDecodeError(err error) {
+	if err != nil && errors.Is(err, converter.ErrUnableToDecode) {
+		panic(fmt.Sprintf("payload decode error: %v", err))
+	}
+}
 
 // WorkflowWithImpl is a temporary struct that implements Registerable. It's meant to be passed into `tempts.NewWorker`.
 type WorkflowWithImpl[Param any, Return any] struct {
@@ -249,7 +263,10 @@ func (w Workflow[Param, Return]) Execute(ctx context.Context, temporalClient *Cl
 func (w Workflow[Param, Return]) RunChild(ctx workflow.Context, opts workflow.ChildWorkflowOptions, param Param) (Return, error) {
 	var ret Return
 	err := w.ExecuteChild(ctx, opts, param).Get(ctx, &ret)
-	return ret, err
+	if err != nil {
+		return ret, err
+	}
+	return ret, nil
 }
 
 // Execute asynchronously executes the workflow from another parent workflow and returns a promise.
