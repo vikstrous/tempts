@@ -188,7 +188,7 @@ func (a Activity[Param, Return]) AppendFuture(ctx workflow.Context, futures *[]w
 func (a Activity[Param, Return]) Run(ctx workflow.Context, param Param) (Return, error) {
 	var result Return
 	err := a.Execute(ctx, param).Get(ctx, &result)
-	if err != nil && isActivityDecodeError(err) {
+	if err != nil && isDecodeError(err) {
 		return result, &DecodeError{err: err}
 	}
 	return result, err

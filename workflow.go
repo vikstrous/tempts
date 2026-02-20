@@ -250,7 +250,7 @@ func (w Workflow[Param, Return]) RunChild(ctx workflow.Context, opts workflow.Ch
 	var ret Return
 	err := w.ExecuteChild(ctx, opts, param).Get(ctx, &ret)
 	if err != nil {
-		if isChildWorkflowDecodeError(err) {
+		if isDecodeError(err) {
 			return ret, &DecodeError{err: err}
 		}
 		return ret, err

@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	"go.temporal.io/sdk/temporal"
+	"go.temporal.io/sdk/converter"
 )
 
 // DecodeError wraps an error that occurred during deserialization of an activity
@@ -37,30 +37,9 @@ func panicOnDecodeError(err error) {
 	}
 }
 
-// isActivityDecodeError returns true if the error from an activity Future.Get()
-// is a deserialization failure rather than an activity execution failure.
-func isActivityDecodeError(err error) bool {
-	if err == nil {
-		return false
-	}
-	var activityErr *temporal.ActivityError
-	var canceledErr *temporal.CanceledError
-	if errors.As(err, &activityErr) || errors.As(err, &canceledErr) {
-		return false
-	}
-	return true
-}
-
-// isChildWorkflowDecodeError returns true if the error from a child workflow
-// Future.Get() is a deserialization failure rather than a child workflow execution failure.
-func isChildWorkflowDecodeError(err error) bool {
-	if err == nil {
-		return false
-	}
-	var childErr *temporal.ChildWorkflowExecutionError
-	var canceledErr *temporal.CanceledError
-	if errors.As(err, &childErr) || errors.As(err, &canceledErr) {
-		return false
-	}
-	return true
+// isDecodeError returns true if the error wraps converter.ErrUnableToDecode,
+// which is the sentinel error used by all Temporal payload converters (JSON,
+// proto, proto-JSON) when deserialization fails.
+func isDecodeError(err error) bool {
+	return err != nil && errors.Is(err, converter.ErrUnableToDecode)
 }
