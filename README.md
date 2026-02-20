@@ -109,6 +109,7 @@ Workflows:
 * Are called with the right parameter types
 * Return the right response types
 * Registered functions match the right type signature
+* Payload decode errors cause workflow task failures instead of workflow execution failures
 
 Schedules:
 
