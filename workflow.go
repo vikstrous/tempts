@@ -63,6 +63,11 @@ func (w WorkflowWithImpl[Param, Return]) ExecuteInTest(e testEnvironment, p Para
 type WorkflowDeclaration interface {
 	Name() string
 	getQueue() *Queue
+	// wrapForReplay wraps a workflow function for replay compatibility.
+	// For positional workflows, this converts the struct-parameter function into
+	// a positional-parameter function matching the on-wire format.
+	// For non-positional workflows, this returns fn unchanged.
+	wrapForReplay(fn any) any
 }
 
 // Workflow is used for interacting with workflows in a safe way that takes into account the input and output types, queue name and other properties.
@@ -138,6 +143,51 @@ func (w Workflow[Param, Return]) Name() string {
 // getQueue returns the queue for the workflow
 func (w Workflow[Param, Return]) getQueue() *Queue {
 	return w.queue
+}
+
+// wrapForReplay wraps fn for replay compatibility. For positional workflows,
+// it creates a function with positional parameters that reconstructs the struct
+// before calling fn. For non-positional workflows, it returns fn unchanged.
+func (w Workflow[Param, Return]) wrapForReplay(fn any) any {
+	if !w.positional {
+		return fn
+	}
+
+	// fn must be func(workflow.Context, Param) (Return, error)
+	fnVal := reflect.ValueOf(fn)
+
+	paramType := reflect.TypeOf((*Param)(nil)).Elem()
+	var fieldTypes []reflect.Type
+	if paramType.Kind() == reflect.Ptr {
+		fieldTypes = extractFieldTypes(paramType.Elem())
+	} else {
+		fieldTypes = extractFieldTypes(paramType)
+	}
+
+	wrapper := reflect.MakeFunc(
+		reflect.FuncOf(
+			append([]reflect.Type{reflect.TypeOf((*workflow.Context)(nil)).Elem()}, fieldTypes...),
+			[]reflect.Type{reflect.TypeOf((*Return)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()},
+			false,
+		),
+		func(args []reflect.Value) []reflect.Value {
+			var paramVal reflect.Value
+			if paramType.Kind() == reflect.Ptr {
+				paramVal = reflect.New(paramType.Elem())
+				for i := 0; i < paramType.Elem().NumField(); i++ {
+					paramVal.Elem().Field(i).Set(args[i+1])
+				}
+			} else {
+				paramVal = reflect.New(paramType).Elem()
+				for i := 0; i < paramType.NumField(); i++ {
+					paramVal.Field(i).Set(args[i+1])
+				}
+			}
+			return fnVal.Call([]reflect.Value{args[0], paramVal})
+		},
+	)
+
+	return wrapper.Interface()
 }
 
 // WithImplementation should be called to create the parameters for NewWorker(). It declares which function implements the workflow.
