@@ -89,6 +89,46 @@ type historiesData struct {
 	WorkflowName string
 }
 
+// FilterWorkflowHistoriesBundle filters a histories bundle to keep only executions where tryReplay
+// returns nil. It returns the filtered bundle as serialized bytes. If no executions pass the filter,
+// it returns an error.
+func FilterWorkflowHistoriesBundle(bundle []byte, tryReplay func(singleExecutionBundle []byte) error) ([]byte, int, error) {
+	var data historiesData
+	if err := json.Unmarshal(bundle, &data); err != nil {
+		return nil, 0, fmt.Errorf("failed to unmarshal histories for filtering: %w", err)
+	}
+
+	var compatible []historyWithMetadata
+	for _, h := range data.Histories {
+		singleBundle, err := json.Marshal(historiesData{
+			WorkflowName: data.WorkflowName,
+			Histories:    []historyWithMetadata{h},
+		})
+		if err != nil {
+			return nil, 0, fmt.Errorf("failed to marshal single history for filtering: %w", err)
+		}
+
+		if tryReplay(singleBundle) == nil {
+			compatible = append(compatible, h)
+		}
+	}
+
+	if len(compatible) == 0 {
+		return nil, len(data.Histories), fmt.Errorf(
+			"no compatible histories found for %s (all %d executions failed replay)",
+			data.WorkflowName, len(data.Histories),
+		)
+	}
+
+	data.Histories = compatible
+	filtered, err := json.Marshal(data)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to marshal filtered histories: %w", err)
+	}
+
+	return filtered, len(compatible), nil
+}
+
 // ReplayWorkflow is meant to be used in tests with the output of GetWorkflowHistoriesBundle to check if the given workflow implementation (fn) is compatible with previous executions captured at the time when GetWorkflowHistoriesBundle was run.
 func ReplayWorkflow(historiesBytes []byte, fn any, opts worker.WorkflowReplayerOptions) error {
 	return replayWorkflow(historiesBytes, fn, opts)
