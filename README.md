@@ -133,8 +133,6 @@ There are two functions in this library that make it easy to write fixture based
 See `example/replay_test.go` for an example of how to use them.
 ```go
 func GetWorkflowHistoriesBundle(ctx context.Context, client *tempts.Client, w tempts.WorkflowDeclaration) ([]byte, error)
-func ReplayWorkflow(historiesBytes []byte, fn any, opts worker.WorkflowReplayerOptions) error
-// Or use the typed method on Workflow, which handles positional workflows automatically:
 func (w Workflow[Param, Return]) ReplayWorkflow(historiesBytes []byte, fn func(workflow.Context, Param) (Return, error), opts worker.WorkflowReplayerOptions) error
 ```
 
