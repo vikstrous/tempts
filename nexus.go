@@ -48,6 +48,7 @@ type SyncOperation[Param, Return any] struct {
 // NewSyncOperation declares a synchronous operation on the given service.
 // Sync operations are simple request-response style handlers.
 func NewSyncOperation[Param, Return any](s *Service, name string) SyncOperation[Param, Return] {
+	panicIfNotStruct[Param]("NewSyncOperation")
 	if _, exists := s.operations[name]; exists {
 		panic(fmt.Sprintf("operation %s already declared on service %s", name, s.name))
 	}
@@ -102,6 +103,7 @@ type AsyncOperation[Param, Return any] struct {
 // NewAsyncOperation declares an asynchronous operation on the given service.
 // Async operations are backed by workflows and can run for extended periods.
 func NewAsyncOperation[Param, Return any](s *Service, name string) AsyncOperation[Param, Return] {
+	panicIfNotStruct[Param]("NewAsyncOperation")
 	if _, exists := s.operations[name]; exists {
 		panic(fmt.Sprintf("operation %s already declared on service %s", name, s.name))
 	}
@@ -213,19 +215,14 @@ func (s *Service) WithImplementations(ops ...OperationWithImpl) (*ServiceWithImp
 
 // NexusClient is used to call Nexus operations from within a workflow.
 type NexusClient struct {
-	endpoint string
-	service  *Service
-	client   workflow.NexusClient
+	client workflow.NexusClient
 }
 
 // NewClient creates a NexusClient for calling operations on this service.
 // The endpoint parameter specifies the Nexus endpoint to use.
 func (s *Service) NewClient(ctx workflow.Context, endpoint string) *NexusClient {
-	client := workflow.NewNexusClient(endpoint, s.name)
 	return &NexusClient{
-		endpoint: endpoint,
-		service:  s,
-		client:   client,
+		client: workflow.NewNexusClient(endpoint, s.name),
 	}
 }
 
