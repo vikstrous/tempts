@@ -120,3 +120,54 @@ func TestOperationPanicIfNotStruct(t *testing.T) {
 		})
 	})
 }
+
+func TestOperationExecutePanicsOnMismatchedClientService(t *testing.T) {
+	t.Run("sync operation with client from different service", func(t *testing.T) {
+		svcA := NewService("service-a")
+		svcB := NewService("service-b")
+
+		syncA := NewSyncOperation[testInput, testOutput](svcA, "shared-op")
+		_ = NewSyncOperation[testInput, testOutput](svcB, "shared-op")
+
+		clientB := &NexusClient{serviceName: svcB.name}
+
+		require.PanicsWithValue(
+			t,
+			"cannot execute operation shared-op on service service-a with client for service service-b",
+			func() {
+				syncA.Execute(nil, clientB, testInput{}, workflow.NexusOperationOptions{})
+			},
+		)
+	})
+
+	t.Run("async operation with client from different service", func(t *testing.T) {
+		svcA := NewService("service-a")
+		svcB := NewService("service-b")
+
+		asyncA := NewAsyncOperation[testInput, testOutput](svcA, "shared-op")
+		_ = NewAsyncOperation[testInput, testOutput](svcB, "shared-op")
+
+		clientB := &NexusClient{serviceName: svcB.name}
+
+		require.PanicsWithValue(
+			t,
+			"cannot execute operation shared-op on service service-a with client for service service-b",
+			func() {
+				asyncA.Execute(nil, clientB, testInput{}, workflow.NexusOperationOptions{})
+			},
+		)
+	})
+
+	t.Run("nil client", func(t *testing.T) {
+		svc := NewService("service-a")
+		syncOp := NewSyncOperation[testInput, testOutput](svc, "op")
+
+		require.PanicsWithValue(
+			t,
+			"cannot execute operation op on service service-a with nil Nexus client",
+			func() {
+				syncOp.Execute(nil, nil, testInput{}, workflow.NexusOperationOptions{})
+			},
+		)
+	})
+}
