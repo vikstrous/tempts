@@ -215,15 +215,32 @@ func (s *Service) WithImplementations(ops ...OperationWithImpl) (*ServiceWithImp
 
 // NexusClient is used to call Nexus operations from within a workflow.
 type NexusClient struct {
-	client workflow.NexusClient
+	client      workflow.NexusClient
+	serviceName string
 }
 
 // NewClient creates a NexusClient for calling operations on this service.
 // The endpoint parameter specifies the Nexus endpoint to use.
 func (s *Service) NewClient(ctx workflow.Context, endpoint string) *NexusClient {
 	return &NexusClient{
-		client: workflow.NewNexusClient(endpoint, s.name),
+		client:      workflow.NewNexusClient(endpoint, s.name),
+		serviceName: s.name,
 	}
+}
+
+func validateServiceMatch(opName string, opService *Service, c *NexusClient) error {
+	if c == nil {
+		return fmt.Errorf("cannot execute operation %s on service %s with nil Nexus client", opName, opService.name)
+	}
+	if c.serviceName != opService.name {
+		return fmt.Errorf(
+			"cannot execute operation %s on service %s with client for service %s",
+			opName,
+			opService.name,
+			c.serviceName,
+		)
+	}
+	return nil
 }
 
 // Run synchronously executes a sync operation and returns the result.
@@ -246,6 +263,11 @@ func (op SyncOperation[Param, Return]) Execute(
 	param Param,
 	opts workflow.NexusOperationOptions,
 ) workflow.NexusOperationFuture {
+	// ExecuteOperation does not return an error, so we panic with an explicit
+	// message for invalid client/service pairing to fail fast during workflow execution.
+	if err := validateServiceMatch(op.name, op.service, c); err != nil {
+		panic(err.Error())
+	}
 	return c.client.ExecuteOperation(ctx, op.name, param, opts)
 }
 
@@ -269,5 +291,10 @@ func (op AsyncOperation[Param, Return]) Execute(
 	param Param,
 	opts workflow.NexusOperationOptions,
 ) workflow.NexusOperationFuture {
+	// ExecuteOperation does not return an error, so we panic with an explicit
+	// message for invalid client/service pairing to fail fast during workflow execution.
+	if err := validateServiceMatch(op.name, op.service, c); err != nil {
+		panic(err.Error())
+	}
 	return c.client.ExecuteOperation(ctx, op.name, param, opts)
 }
