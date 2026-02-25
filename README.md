@@ -438,7 +438,7 @@ wrk, err := tempts.NewWorker(queueMain, []tempts.Registerable{
     transformOp.WithImplementation(func(ctx context.Context, input TransformInput, opts nexus.StartOperationOptions) (temporalnexus.WorkflowHandle[TransformOutput], error) {
         return temporalnexus.ExecuteWorkflow(ctx, opts, client.StartWorkflowOptions{
             ID: "transform-" + opts.RequestID,
-        }, processWorkflow, ProcessInput{Data: input.RawData})
+        }, transformWorkflow, ProcessInput{Data: input.RawData})
     }),
 })
 ```

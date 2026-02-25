@@ -230,6 +230,110 @@ func TestAsyncHandlerOperationWithImplementation(t *testing.T) {
 	})
 }
 
+func TestWithImplementationsAsyncHandlerWrongService(t *testing.T) {
+	svc1 := NewService("svc1")
+	svc2 := NewService("svc2")
+	op := NewAsyncHandlerOperation[testInput, testOutput](svc1, "op")
+	NewAsyncHandlerOperation[testInput, testOutput](svc2, "op2")
+
+	_, err := svc2.WithImplementations(
+		op.WithImplementation(func(ctx context.Context, input testInput, opts nexus.StartOperationOptions) (temporalnexus.WorkflowHandle[testOutput], error) {
+			return nil, nil
+		}),
+	)
+	require.ErrorContains(t, err, "operation op belongs to service svc1, not svc2")
+}
+
+func TestNewWorkerWithServiceWithImpl(t *testing.T) {
+	q := NewQueue("test-q")
+	svc := NewService("test-svc")
+	syncOp := NewSyncOperation[testInput, testOutput](svc, "sync")
+	asyncOp := NewAsyncOperation[testInput, testOutput](svc, "async")
+
+	bundled, err := svc.WithImplementations(
+		syncOp.WithImplementation(func(ctx context.Context, input testInput, opts nexus.StartOperationOptions) (testOutput, error) {
+			return testOutput{}, nil
+		}),
+		asyncOp.WithImplementation(
+			func(ctx workflow.Context, input testInput) (testOutput, error) { return testOutput{}, nil },
+			func(ctx context.Context, input testInput, opts nexus.StartOperationOptions) (client.StartWorkflowOptions, error) {
+				return client.StartWorkflowOptions{}, nil
+			},
+		),
+	)
+	require.NoError(t, err)
+
+	wrk, err := NewWorker(q, []Registerable{bundled})
+	require.NoError(t, err)
+	require.NotNil(t, wrk)
+}
+
+func TestNewWorkerRejectsMixedRegistrationStyles(t *testing.T) {
+	t.Run("bundled then individual", func(t *testing.T) {
+		q := NewQueue("test-q")
+		svc := NewService("test-svc")
+		syncOp := NewSyncOperation[testInput, testOutput](svc, "sync")
+		asyncOp := NewAsyncOperation[testInput, testOutput](svc, "async")
+
+		bundled, err := svc.WithImplementations(
+			syncOp.WithImplementation(func(ctx context.Context, input testInput, opts nexus.StartOperationOptions) (testOutput, error) {
+				return testOutput{}, nil
+			}),
+			asyncOp.WithImplementation(
+				func(ctx workflow.Context, input testInput) (testOutput, error) { return testOutput{}, nil },
+				func(ctx context.Context, input testInput, opts nexus.StartOperationOptions) (client.StartWorkflowOptions, error) {
+					return client.StartWorkflowOptions{}, nil
+				},
+			),
+		)
+		require.NoError(t, err)
+
+		// Create a second service with the same name and an individual op
+		svc2 := NewService("test-svc")
+		op2 := NewSyncOperation[testInput, testOutput](svc2, "extra")
+
+		_, err = NewWorker(q, []Registerable{
+			bundled,
+			op2.WithImplementation(func(ctx context.Context, input testInput, opts nexus.StartOperationOptions) (testOutput, error) {
+				return testOutput{}, nil
+			}),
+		})
+		require.ErrorContains(t, err, "nexus service test-svc has both bundled and individual operation implementations")
+	})
+
+	t.Run("individual then bundled", func(t *testing.T) {
+		q := NewQueue("test-q")
+		svc := NewService("test-svc")
+		syncOp := NewSyncOperation[testInput, testOutput](svc, "sync")
+		asyncOp := NewAsyncOperation[testInput, testOutput](svc, "async")
+
+		bundled, err := svc.WithImplementations(
+			syncOp.WithImplementation(func(ctx context.Context, input testInput, opts nexus.StartOperationOptions) (testOutput, error) {
+				return testOutput{}, nil
+			}),
+			asyncOp.WithImplementation(
+				func(ctx workflow.Context, input testInput) (testOutput, error) { return testOutput{}, nil },
+				func(ctx context.Context, input testInput, opts nexus.StartOperationOptions) (client.StartWorkflowOptions, error) {
+					return client.StartWorkflowOptions{}, nil
+				},
+			),
+		)
+		require.NoError(t, err)
+
+		// Create a second service with the same name and an individual op
+		svc2 := NewService("test-svc")
+		op2 := NewSyncOperation[testInput, testOutput](svc2, "extra")
+
+		_, err = NewWorker(q, []Registerable{
+			op2.WithImplementation(func(ctx context.Context, input testInput, opts nexus.StartOperationOptions) (testOutput, error) {
+				return testOutput{}, nil
+			}),
+			bundled,
+		})
+		require.ErrorContains(t, err, "nexus service test-svc has both bundled and individual operation implementations")
+	})
+}
+
 func TestAsyncHandlerOperationClientValidation(t *testing.T) {
 	t.Run("panics on mismatched service", func(t *testing.T) {
 		svcA := NewService("service-a")

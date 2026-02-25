@@ -73,11 +73,17 @@ func processGetOptions(ctx context.Context, input ProcessInput, opts nexus.Start
 	}, nil
 }
 
+// transformWorkflow is the workflow that backs the transform async handler operation.
+// It accepts ProcessInput (different from the operation's TransformInput) and returns TransformOutput.
+func transformWorkflow(ctx workflow.Context, input ProcessInput) (TransformOutput, error) {
+	return TransformOutput{Result: "Transformed: " + input.Data}, nil
+}
+
 // transformHandler maps the operation input to a workflow with different input types
 func transformHandler(ctx context.Context, input TransformInput, opts nexus.StartOperationOptions) (temporalnexus.WorkflowHandle[TransformOutput], error) {
 	return temporalnexus.ExecuteWorkflow(ctx, opts, client.StartWorkflowOptions{
 		ID: "transform-" + opts.RequestID,
-	}, processWorkflow, ProcessInput{Data: input.RawData})
+	}, transformWorkflow, ProcessInput{Data: input.RawData})
 }
 
 // nexusOperations returns the operation implementations for the Nexus service.

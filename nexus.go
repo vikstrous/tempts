@@ -87,10 +87,10 @@ func (op *SyncOperationWithImpl[Param, Return]) toNexusOperation() (nexus.Regist
 func (op *SyncOperationWithImpl[Param, Return]) register(_ worker.Registry) {}
 
 func (op *SyncOperationWithImpl[Param, Return]) validate(v *validationState) error {
-	if _, ok := v.nexusServicesHandled[op.op.service]; ok {
+	if _, ok := v.nexusServicesHandled[op.op.service.name]; ok {
 		return fmt.Errorf("nexus service %s has both bundled and individual operation implementations; use one or the other", op.op.service.name)
 	}
-	v.nexusOps[op.op.service] = append(v.nexusOps[op.op.service], op)
+	v.nexusOps[op.op.service.name] = append(v.nexusOps[op.op.service.name], op)
 	return nil
 }
 
@@ -157,10 +157,10 @@ func (op *AsyncOperationWithImpl[Param, Return]) toNexusOperation() (nexus.Regis
 func (op *AsyncOperationWithImpl[Param, Return]) register(_ worker.Registry) {}
 
 func (op *AsyncOperationWithImpl[Param, Return]) validate(v *validationState) error {
-	if _, ok := v.nexusServicesHandled[op.op.service]; ok {
+	if _, ok := v.nexusServicesHandled[op.op.service.name]; ok {
 		return fmt.Errorf("nexus service %s has both bundled and individual operation implementations; use one or the other", op.op.service.name)
 	}
-	v.nexusOps[op.op.service] = append(v.nexusOps[op.op.service], op)
+	v.nexusOps[op.op.service.name] = append(v.nexusOps[op.op.service.name], op)
 	return nil
 }
 
@@ -234,10 +234,10 @@ func (op *AsyncHandlerOperationWithImpl[Param, Return]) toNexusOperation() (nexu
 func (op *AsyncHandlerOperationWithImpl[Param, Return]) register(_ worker.Registry) {}
 
 func (op *AsyncHandlerOperationWithImpl[Param, Return]) validate(v *validationState) error {
-	if _, ok := v.nexusServicesHandled[op.op.service]; ok {
+	if _, ok := v.nexusServicesHandled[op.op.service.name]; ok {
 		return fmt.Errorf("nexus service %s has both bundled and individual operation implementations; use one or the other", op.op.service.name)
 	}
-	v.nexusOps[op.op.service] = append(v.nexusOps[op.op.service], op)
+	v.nexusOps[op.op.service.name] = append(v.nexusOps[op.op.service.name], op)
 	return nil
 }
 
@@ -295,13 +295,13 @@ func (s *ServiceWithImpl) register(ar worker.Registry) {
 }
 
 func (s *ServiceWithImpl) validate(v *validationState) error {
-	if _, ok := v.nexusServicesHandled[s.service]; ok {
+	if _, ok := v.nexusServicesHandled[s.service.name]; ok {
 		return fmt.Errorf("duplicate registration for nexus service %s", s.service.name)
 	}
-	if _, ok := v.nexusOps[s.service]; ok {
+	if _, ok := v.nexusOps[s.service.name]; ok {
 		return fmt.Errorf("nexus service %s has both bundled and individual operation implementations; use one or the other", s.service.name)
 	}
-	v.nexusServicesHandled[s.service] = struct{}{}
+	v.nexusServicesHandled[s.service.name] = struct{}{}
 	return nil
 }
 

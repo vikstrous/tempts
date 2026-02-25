@@ -24,10 +24,10 @@ type validationState struct {
 	queue               *Queue
 	activitiesValidated map[string]struct{}
 	workflowsValidated  map[string]struct{}
-	// nexusOps groups operation implementations by their parent service.
-	nexusOps map[*Service][]OperationWithImpl
-	// nexusServicesHandled tracks services that were passed as pre-validated ServiceWithImpl.
-	nexusServicesHandled map[*Service]struct{}
+	// nexusOps groups operation implementations by their parent service name.
+	nexusOps map[string][]OperationWithImpl
+	// nexusServicesHandled tracks service names that were passed as pre-validated ServiceWithImpl.
+	nexusServicesHandled map[string]struct{}
 }
 
 // NewWorker defines a worker along with all of the workflows, activities and Nexus operations.
@@ -46,8 +46,8 @@ func NewWorker(queue *Queue, registerables []Registerable) (*Worker, error) {
 		queue:                queue,
 		activitiesValidated:  map[string]struct{}{},
 		workflowsValidated:  map[string]struct{}{},
-		nexusOps:             map[*Service][]OperationWithImpl{},
-		nexusServicesHandled: map[*Service]struct{}{},
+		nexusOps:             map[string][]OperationWithImpl{},
+		nexusServicesHandled: map[string]struct{}{},
 	}
 	for _, r := range registerables {
 		err := r.validate(v)
@@ -78,7 +78,8 @@ func NewWorker(queue *Queue, registerables []Registerable) (*Worker, error) {
 
 	// Bundle nexus operations into services and validate completeness.
 	var services []*ServiceWithImpl
-	for svc, ops := range v.nexusOps {
+	for _, ops := range v.nexusOps {
+		svc := ops[0].getService()
 		svcImpl, err := svc.WithImplementations(ops...)
 		if err != nil {
 			return nil, err
