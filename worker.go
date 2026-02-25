@@ -17,11 +17,11 @@ type Worker struct {
 // It's a parameter to `tempts.NewWorker()`.
 type Registerable interface {
 	register(ar worker.Registry)
-	// Make sure this activity or workflow is valid for this queue
-	validate(q *Queue, v *validationState) error
+	validate(v *validationState) error
 }
 
 type validationState struct {
+	queue               *Queue
 	activitiesValidated map[string]struct{}
 	workflowsValidated  map[string]struct{}
 	// nexusOps groups operation implementations by their parent service.
@@ -41,12 +41,13 @@ wrk, err := tempts.NewWorker(queueMain, []tempts.Registerable{
 */
 func NewWorker(queue *Queue, registerables []Registerable) (*Worker, error) {
 	v := &validationState{
+		queue:               queue,
 		activitiesValidated: map[string]struct{}{},
 		workflowsValidated:  map[string]struct{}{},
 		nexusOps:            map[*Service][]OperationWithImpl{},
 	}
 	for _, r := range registerables {
-		err := r.validate(queue, v)
+		err := r.validate(v)
 		if err != nil {
 			return nil, err
 		}

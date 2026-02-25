@@ -30,13 +30,13 @@ func (w WorkflowWithImpl[Param, Return]) register(ar worker.Registry) {
 	ar.RegisterWorkflowWithOptions(w.fn, workflow.RegisterOptions{Name: w.workflowName})
 }
 
-func (w WorkflowWithImpl[Param, Return]) validate(q *Queue, v *validationState) error {
-	if w.queue.name != q.name {
-		return fmt.Errorf("workflow for queue %s can't be registered on worker with queue %s", w.queue.name, q.name)
+func (w WorkflowWithImpl[Param, Return]) validate(v *validationState) error {
+	if w.queue.name != v.queue.name {
+		return fmt.Errorf("workflow for queue %s can't be registered on worker with queue %s", w.queue.name, v.queue.name)
 	}
 	_, ok := v.workflowsValidated[w.workflowName]
 	if ok {
-		return fmt.Errorf("duplicate activtity name %s for queue %s", w.workflowName, q.name)
+		return fmt.Errorf("duplicate activtity name %s for queue %s", w.workflowName, v.queue.name)
 	}
 	v.workflowsValidated[w.workflowName] = struct{}{}
 	return nil

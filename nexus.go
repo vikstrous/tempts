@@ -86,7 +86,7 @@ func (op *SyncOperationWithImpl[Param, Return]) toNexusOperation() nexus.Registe
 
 func (op *SyncOperationWithImpl[Param, Return]) register(_ worker.Registry) {}
 
-func (op *SyncOperationWithImpl[Param, Return]) validate(_ *Queue, v *validationState) error {
+func (op *SyncOperationWithImpl[Param, Return]) validate(v *validationState) error {
 	v.nexusOps[op.op.service] = append(v.nexusOps[op.op.service], op)
 	return nil
 }
@@ -153,7 +153,7 @@ func (op *AsyncOperationWithImpl[Param, Return]) toNexusOperation() nexus.Regist
 
 func (op *AsyncOperationWithImpl[Param, Return]) register(_ worker.Registry) {}
 
-func (op *AsyncOperationWithImpl[Param, Return]) validate(_ *Queue, v *validationState) error {
+func (op *AsyncOperationWithImpl[Param, Return]) validate(v *validationState) error {
 	v.nexusOps[op.op.service] = append(v.nexusOps[op.op.service], op)
 	return nil
 }
@@ -227,7 +227,7 @@ func (op *AsyncHandlerOperationWithImpl[Param, Return]) toNexusOperation() nexus
 
 func (op *AsyncHandlerOperationWithImpl[Param, Return]) register(_ worker.Registry) {}
 
-func (op *AsyncHandlerOperationWithImpl[Param, Return]) validate(_ *Queue, v *validationState) error {
+func (op *AsyncHandlerOperationWithImpl[Param, Return]) validate(v *validationState) error {
 	v.nexusOps[op.op.service] = append(v.nexusOps[op.op.service], op)
 	return nil
 }
@@ -285,7 +285,7 @@ func (s *ServiceWithImpl) register(ar worker.Registry) {
 	}
 }
 
-func (s *ServiceWithImpl) validate(_ *Queue, _ *validationState) error {
+func (s *ServiceWithImpl) validate(_ *validationState) error {
 	return nil
 }
 
