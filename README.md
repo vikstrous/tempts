@@ -129,10 +129,10 @@ Signals:
 
 Nexus Operations:
 
+* Registered handlers match the right type signature (also provided by the native Nexus SDK via generics)
+* Are called with the right parameter types (the native SDK's `ExecuteOperation` accepts `any`, so call-site type safety is only enforced by tempts)
+* Return the right response types (same as above — call-site only)
 * Are declared on a specific service
-* Are called with the right parameter types
-* Return the right response types
-* Registered handlers match the right type signature
 * All declared operations must have implementations (validated at service creation)
 * Parameter types must be structs (enforced at declaration time)
 * Operations can only be called with a client created from the same service
