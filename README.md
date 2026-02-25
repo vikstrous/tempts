@@ -136,6 +136,7 @@ Nexus Operations:
 * All declared operations must have implementations (validated at service creation)
 * Parameter types must be structs (enforced at declaration time)
 * Operations can only be called with a client created from the same service
+* Async handler operations allow operation input to differ from workflow input while maintaining type safety on the operation boundary
 
 ### Tools
 
@@ -419,6 +420,11 @@ type ProcessInput struct { Data string }
 type ProcessOutput struct { Result string }
 var processOp = tempts.NewAsyncOperation[ProcessInput, ProcessOutput](myService, "process")
 
+// Async handler operation - when operation input differs from workflow input
+type TransformInput struct { RawData string }
+type TransformOutput struct { Result string }
+var transformOp = tempts.NewAsyncHandlerOperation[TransformInput, TransformOutput](myService, "transform")
+
 // Operation implementations go directly into NewWorker alongside activities and workflows.
 // NewWorker groups them by service and validates that all declared operations have implementations.
 wrk, err := tempts.NewWorker(queueMain, []tempts.Registerable{
@@ -428,6 +434,11 @@ wrk, err := tempts.NewWorker(queueMain, []tempts.Registerable{
     }),
     processOp.WithImplementation(processWorkflow, func(ctx context.Context, input ProcessInput, opts nexus.StartOperationOptions) (client.StartWorkflowOptions, error) {
         return client.StartWorkflowOptions{ID: "process-" + opts.RequestID}, nil
+    }),
+    transformOp.WithImplementation(func(ctx context.Context, input TransformInput, opts nexus.StartOperationOptions) (temporalnexus.WorkflowHandle[TransformOutput], error) {
+        return temporalnexus.ExecuteWorkflow(ctx, opts, client.StartWorkflowOptions{
+            ID: "transform-" + opts.RequestID,
+        }, processWorkflow, ProcessInput{Data: input.RawData})
     }),
 })
 ```

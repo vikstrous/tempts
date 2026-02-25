@@ -6,6 +6,7 @@ import (
 	"github.com/nexus-rpc/sdk-go/nexus"
 	"github.com/vikstrous/tempts"
 	"go.temporal.io/sdk/client"
+	"go.temporal.io/sdk/temporalnexus"
 	"go.temporal.io/sdk/workflow"
 )
 
@@ -38,6 +39,19 @@ type ProcessOutput struct {
 // Async operation declaration - workflow-backed, can run for extended periods
 var processOp = tempts.NewAsyncOperation[ProcessInput, ProcessOutput](myNexusService, "process")
 
+// TransformInput is the input for the transform operation (differs from workflow input)
+type TransformInput struct {
+	RawData string
+}
+
+// TransformOutput is the output from the transform operation
+type TransformOutput struct {
+	Result string
+}
+
+// Async handler operation - operation input differs from workflow input
+var transformOp = tempts.NewAsyncHandlerOperation[TransformInput, TransformOutput](myNexusService, "transform")
+
 // Handler implementations - this would typically be in a handler package
 
 // echoHandler is the implementation for the echo sync operation
@@ -59,12 +73,20 @@ func processGetOptions(ctx context.Context, input ProcessInput, opts nexus.Start
 	}, nil
 }
 
+// transformHandler maps the operation input to a workflow with different input types
+func transformHandler(ctx context.Context, input TransformInput, opts nexus.StartOperationOptions) (temporalnexus.WorkflowHandle[TransformOutput], error) {
+	return temporalnexus.ExecuteWorkflow(ctx, opts, client.StartWorkflowOptions{
+		ID: "transform-" + opts.RequestID,
+	}, processWorkflow, ProcessInput{Data: input.RawData})
+}
+
 // nexusOperations returns the operation implementations for the Nexus service.
 // These are passed directly into NewWorker as Registerables.
 func nexusOperations() []tempts.Registerable {
 	return []tempts.Registerable{
 		echoOp.WithImplementation(echoHandler),
 		processOp.WithImplementation(processWorkflow, processGetOptions),
+		transformOp.WithImplementation(transformHandler),
 	}
 }
 
