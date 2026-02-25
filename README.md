@@ -419,24 +419,20 @@ type ProcessInput struct { Data string }
 type ProcessOutput struct { Result string }
 var processOp = tempts.NewAsyncOperation[ProcessInput, ProcessOutput](myService, "process")
 
-// In your handler package, create the service with implementations
-svc, err := myService.WithImplementations(
+// Operation implementations go directly into NewWorker alongside activities and workflows.
+// NewWorker groups them by service and validates that all declared operations have implementations.
+wrk, err := tempts.NewWorker(queueMain, []tempts.Registerable{
+    workflowType.WithImplementation(workflowFn),
     echoOp.WithImplementation(func(ctx context.Context, input EchoInput, opts nexus.StartOperationOptions) (EchoOutput, error) {
         return EchoOutput{Message: input.Message}, nil
     }),
     processOp.WithImplementation(processWorkflow, func(ctx context.Context, input ProcessInput, opts nexus.StartOperationOptions) (client.StartWorkflowOptions, error) {
         return client.StartWorkflowOptions{ID: "process-" + opts.RequestID}, nil
     }),
-)
-
-// Create worker with the Nexus service alongside activities and workflows
-wrk, err := tempts.NewWorker(queueMain, []tempts.Registerable{
-    workflowType.WithImplementation(workflowFn),
-    svc,
 })
 ```
 
-This ensures that all declared operations have implementations and no extra implementations are provided. A single operation object is used for both declaration and implementation, unlike the native SDK which requires separate `OperationReference[I, O]` objects. Nexus services implement `Registerable` and go in the same list as activities and workflows.
+This ensures that all declared operations have implementations and no extra implementations are provided. A single operation object is used for both declaration and implementation, unlike the native SDK which requires separate `OperationReference[I, O]` objects.
 
 ### Call Nexus operations from a workflow
 

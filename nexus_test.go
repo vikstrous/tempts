@@ -105,6 +105,56 @@ func TestDuplicateOperationName(t *testing.T) {
 	})
 }
 
+func TestNewWorkerWithNexusOperations(t *testing.T) {
+	t.Run("operations registered directly", func(t *testing.T) {
+		q := NewQueue("test-q")
+		svc := NewService("test-svc")
+		syncOp := NewSyncOperation[testInput, testOutput](svc, "sync")
+		asyncOp := NewAsyncOperation[testInput, testOutput](svc, "async")
+
+		wrk, err := NewWorker(q, []Registerable{
+			syncOp.WithImplementation(func(ctx context.Context, input testInput, opts nexus.StartOperationOptions) (testOutput, error) {
+				return testOutput{}, nil
+			}),
+			asyncOp.WithImplementation(
+				func(ctx workflow.Context, input testInput) (testOutput, error) { return testOutput{}, nil },
+				func(ctx context.Context, input testInput, opts nexus.StartOperationOptions) (client.StartWorkflowOptions, error) {
+					return client.StartWorkflowOptions{}, nil
+				},
+			),
+		})
+		require.NoError(t, err)
+		require.NotNil(t, wrk)
+	})
+
+	t.Run("missing operation detected", func(t *testing.T) {
+		q := NewQueue("test-q")
+		svc := NewService("test-svc")
+		NewSyncOperation[testInput, testOutput](svc, "op1")
+		op2 := NewSyncOperation[testInput, testOutput](svc, "op2")
+
+		_, err := NewWorker(q, []Registerable{
+			op2.WithImplementation(func(ctx context.Context, input testInput, opts nexus.StartOperationOptions) (testOutput, error) {
+				return testOutput{}, nil
+			}),
+		})
+		require.ErrorContains(t, err, "missing implementation for operation op1")
+	})
+
+	t.Run("duplicate operation detected", func(t *testing.T) {
+		q := NewQueue("test-q")
+		svc := NewService("test-svc")
+		syncOp := NewSyncOperation[testInput, testOutput](svc, "op")
+
+		impl := syncOp.WithImplementation(func(ctx context.Context, input testInput, opts nexus.StartOperationOptions) (testOutput, error) {
+			return testOutput{}, nil
+		})
+
+		_, err := NewWorker(q, []Registerable{impl, impl})
+		require.ErrorContains(t, err, "duplicate implementation for operation op")
+	})
+}
+
 func TestOperationPanicIfNotStruct(t *testing.T) {
 	t.Run("sync non-struct param", func(t *testing.T) {
 		svc := NewService("test-svc")

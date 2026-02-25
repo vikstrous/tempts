@@ -59,12 +59,13 @@ func processGetOptions(ctx context.Context, input ProcessInput, opts nexus.Start
 	}, nil
 }
 
-// createNexusService creates the service with all implementations
-func createNexusService() (*tempts.ServiceWithImpl, error) {
-	return myNexusService.WithImplementations(
+// nexusOperations returns the operation implementations for the Nexus service.
+// These are passed directly into NewWorker as Registerables.
+func nexusOperations() []tempts.Registerable {
+	return []tempts.Registerable{
 		echoOp.WithImplementation(echoHandler),
 		processOp.WithImplementation(processWorkflow, processGetOptions),
-	)
+	}
 }
 
 // exampleCallerWorkflow demonstrates calling Nexus operations from a workflow
@@ -107,17 +108,10 @@ func exampleAsyncCallerWorkflow(ctx workflow.Context, message string) (string, e
 
 // This example shows how to set up a worker with Nexus services
 func exampleNexusWorkerSetup() {
-	// Create the service with implementations
-	svc, err := createNexusService()
-	if err != nil {
-		panic(err)
-	}
-
-	// Create a worker with the Nexus service alongside activities and workflows
-	_, err = tempts.NewWorker(queueMain, []tempts.Registerable{
+	// Create a worker with Nexus operations alongside activities and workflows
+	_, err := tempts.NewWorker(queueMain, append([]tempts.Registerable{
 		// Register any activities and workflows needed
-		svc,
-	})
+	}, nexusOperations()...))
 	if err != nil {
 		panic(err)
 	}

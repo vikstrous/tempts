@@ -24,31 +24,26 @@ type Registerable interface {
 type validationState struct {
 	activitiesValidated map[string]struct{}
 	workflowsValidated  map[string]struct{}
+	// nexusOps groups operation implementations by their parent service.
+	nexusOps map[*Service][]OperationWithImpl
 }
 
-// NewWorker defines a worker along with all of the workflows and activities. Example usage:
+// NewWorker defines a worker along with all of the workflows, activities and Nexus operations.
+// Nexus operation implementations are automatically grouped by service and validated for
+// completeness (all declared operations must have implementations). Example usage:
 /*
 wrk, err := tempts.NewWorker(queueMain, []tempts.Registerable{
 	activityTypeFormatName.WithImplementation(activityFormatName),
-	activityTypeGreet.WithImplementation(activityGreet),
 	workflowTypeFormatAndGreet.WithImplementation(workflowFormatAndGreet),
-	workflowTypeJustGreet.WithImplementation(workflowJustGreet),
-})
-
-Nexus services implement Registerable and go in the same list:
-svc, err := myService.WithImplementations(
 	echoOp.WithImplementation(echoHandler),
 	processOp.WithImplementation(processWorkflow, processGetOptions),
-)
-wrk, err := tempts.NewWorker(queueMain, []tempts.Registerable{
-	workflowType.WithImplementation(workflowFn),
-	svc,
 })
 */
 func NewWorker(queue *Queue, registerables []Registerable) (*Worker, error) {
 	v := &validationState{
 		activitiesValidated: map[string]struct{}{},
 		workflowsValidated:  map[string]struct{}{},
+		nexusOps:            map[*Service][]OperationWithImpl{},
 	}
 	for _, r := range registerables {
 		err := r.validate(queue, v)
@@ -76,7 +71,25 @@ func NewWorker(queue *Queue, registerables []Registerable) (*Worker, error) {
 			return nil, fmt.Errorf("an implementation for workflow %s provided, but not registered with queue", w)
 		}
 	}
-	return &Worker{queue: queue, registerables: registerables}, nil
+
+	// Bundle nexus operations into services and validate completeness.
+	var services []*ServiceWithImpl
+	for svc, ops := range v.nexusOps {
+		svcImpl, err := svc.WithImplementations(ops...)
+		if err != nil {
+			return nil, err
+		}
+		services = append(services, svcImpl)
+	}
+
+	// Add the built ServiceWithImpls to registerables so Register() picks them up.
+	allRegisterables := make([]Registerable, 0, len(registerables)+len(services))
+	allRegisterables = append(allRegisterables, registerables...)
+	for _, svc := range services {
+		allRegisterables = append(allRegisterables, svc)
+	}
+
+	return &Worker{queue: queue, registerables: allRegisterables}, nil
 }
 
 // Register is useful in unit tests to define all of the worker's workflows and activities in the test environment.

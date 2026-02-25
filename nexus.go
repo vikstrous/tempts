@@ -32,7 +32,8 @@ func (s *Service) Name() string {
 }
 
 // OperationWithImpl is implemented by operations that have an implementation attached.
-// It's used as a parameter to Service.WithImplementations().
+// It implements Registerable and can be passed directly into NewWorker, or used with
+// Service.WithImplementations() for pre-validation.
 type OperationWithImpl interface {
 	getOperationName() string
 	getService() *Service
@@ -81,6 +82,13 @@ func (op *SyncOperationWithImpl[Param, Return]) getService() *Service {
 
 func (op *SyncOperationWithImpl[Param, Return]) toNexusOperation() nexus.RegisterableOperation {
 	return nexus.NewSyncOperation(op.op.name, op.handler)
+}
+
+func (op *SyncOperationWithImpl[Param, Return]) register(_ worker.Registry) {}
+
+func (op *SyncOperationWithImpl[Param, Return]) validate(_ *Queue, v *validationState) error {
+	v.nexusOps[op.op.service] = append(v.nexusOps[op.op.service], op)
+	return nil
 }
 
 // WithImplementation attaches an implementation to a sync operation.
@@ -141,6 +149,13 @@ func (op *AsyncOperationWithImpl[Param, Return]) toNexusOperation() nexus.Regist
 		op.workflow,
 		op.getOptions,
 	)
+}
+
+func (op *AsyncOperationWithImpl[Param, Return]) register(_ worker.Registry) {}
+
+func (op *AsyncOperationWithImpl[Param, Return]) validate(_ *Queue, v *validationState) error {
+	v.nexusOps[op.op.service] = append(v.nexusOps[op.op.service], op)
+	return nil
 }
 
 // WithImplementation attaches a workflow implementation to an async operation.
