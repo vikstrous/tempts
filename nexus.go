@@ -198,6 +198,53 @@ func (op AsyncHandlerOperation[Param, Return]) Name() string {
 	return op.name
 }
 
+// AsyncHandlerOperationWithImpl holds an async handler operation along with its handler.
+type AsyncHandlerOperationWithImpl[Param, Return any] struct {
+	op      AsyncHandlerOperation[Param, Return]
+	handler func(context.Context, Param, nexus.StartOperationOptions) (temporalnexus.WorkflowHandle[Return], error)
+}
+
+func (op *AsyncHandlerOperationWithImpl[Param, Return]) getOperationName() string {
+	return op.op.name
+}
+
+func (op *AsyncHandlerOperationWithImpl[Param, Return]) getService() *Service {
+	return op.op.service
+}
+
+func (op *AsyncHandlerOperationWithImpl[Param, Return]) toNexusOperation() nexus.RegisterableOperation {
+	nop, err := temporalnexus.NewWorkflowRunOperationWithOptions(
+		temporalnexus.WorkflowRunOperationOptions[Param, Return]{
+			Name:    op.op.name,
+			Handler: op.handler,
+		},
+	)
+	if err != nil {
+		panic(fmt.Sprintf("failed to create nexus operation %s: %v", op.op.name, err))
+	}
+	return nop
+}
+
+func (op *AsyncHandlerOperationWithImpl[Param, Return]) register(_ worker.Registry) {}
+
+func (op *AsyncHandlerOperationWithImpl[Param, Return]) validate(_ *Queue, v *validationState) error {
+	v.nexusOps[op.op.service] = append(v.nexusOps[op.op.service], op)
+	return nil
+}
+
+// WithImplementation attaches a handler to an async handler operation.
+// The handler receives the operation input and start options, and returns a WorkflowHandle
+// by calling temporalnexus.ExecuteWorkflow (or ExecuteUntypedWorkflow) to start any workflow
+// with any input type.
+func (op AsyncHandlerOperation[Param, Return]) WithImplementation(
+	handler func(context.Context, Param, nexus.StartOperationOptions) (temporalnexus.WorkflowHandle[Return], error),
+) *AsyncHandlerOperationWithImpl[Param, Return] {
+	return &AsyncHandlerOperationWithImpl[Param, Return]{
+		op:      op,
+		handler: handler,
+	}
+}
+
 // ServiceWithImpl holds a service along with all its operation implementations.
 // It implements Registerable and can be passed directly into NewWorker alongside
 // activities and workflows.

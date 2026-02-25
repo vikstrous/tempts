@@ -7,6 +7,7 @@ import (
 	"github.com/nexus-rpc/sdk-go/nexus"
 	"github.com/stretchr/testify/require"
 	"go.temporal.io/sdk/client"
+	"go.temporal.io/sdk/temporalnexus"
 	"go.temporal.io/sdk/workflow"
 )
 
@@ -183,6 +184,49 @@ func TestAsyncHandlerOperationDeclaration(t *testing.T) {
 		require.PanicsWithValue(t, "operation op already declared on service test-svc", func() {
 			NewAsyncHandlerOperation[testInput, testOutput](svc, "op")
 		})
+	})
+}
+
+func TestAsyncHandlerOperationWithImplementation(t *testing.T) {
+	t.Run("via WithImplementations", func(t *testing.T) {
+		svc := NewService("test-svc")
+		op := NewAsyncHandlerOperation[testInput, testOutput](svc, "handler-op")
+
+		result, err := svc.WithImplementations(
+			op.WithImplementation(func(ctx context.Context, input testInput, opts nexus.StartOperationOptions) (temporalnexus.WorkflowHandle[testOutput], error) {
+				return nil, nil
+			}),
+		)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+	})
+
+	t.Run("via NewWorker", func(t *testing.T) {
+		q := NewQueue("test-q")
+		svc := NewService("test-svc")
+		op := NewAsyncHandlerOperation[testInput, testOutput](svc, "handler-op")
+
+		wrk, err := NewWorker(q, []Registerable{
+			op.WithImplementation(func(ctx context.Context, input testInput, opts nexus.StartOperationOptions) (temporalnexus.WorkflowHandle[testOutput], error) {
+				return nil, nil
+			}),
+		})
+		require.NoError(t, err)
+		require.NotNil(t, wrk)
+	})
+
+	t.Run("missing handler op detected by NewWorker", func(t *testing.T) {
+		q := NewQueue("test-q")
+		svc := NewService("test-svc")
+		NewAsyncHandlerOperation[testInput, testOutput](svc, "op1")
+		op2 := NewSyncOperation[testInput, testOutput](svc, "op2")
+
+		_, err := NewWorker(q, []Registerable{
+			op2.WithImplementation(func(ctx context.Context, input testInput, opts nexus.StartOperationOptions) (testOutput, error) {
+				return testOutput{}, nil
+			}),
+		})
+		require.ErrorContains(t, err, "missing implementation for operation op1")
 	})
 }
 
