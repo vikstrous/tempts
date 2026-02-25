@@ -172,6 +172,32 @@ func (op AsyncOperation[Param, Return]) WithImplementation(
 	}
 }
 
+// AsyncHandlerOperation represents an asynchronous Nexus operation with a custom handler.
+// Unlike AsyncOperation, the handler has full control over workflow execution,
+// allowing the operation input type to differ from the workflow input type.
+type AsyncHandlerOperation[Param, Return any] struct {
+	name    string
+	service *Service
+}
+
+// NewAsyncHandlerOperation declares an asynchronous handler operation on the given service.
+func NewAsyncHandlerOperation[Param, Return any](s *Service, name string) AsyncHandlerOperation[Param, Return] {
+	panicIfNotStruct[Param]("NewAsyncHandlerOperation")
+	if _, exists := s.operations[name]; exists {
+		panic(fmt.Sprintf("operation %s already declared on service %s", name, s.name))
+	}
+	s.operations[name] = struct{}{}
+	return AsyncHandlerOperation[Param, Return]{
+		name:    name,
+		service: s,
+	}
+}
+
+// Name returns the name of the operation.
+func (op AsyncHandlerOperation[Param, Return]) Name() string {
+	return op.name
+}
+
 // ServiceWithImpl holds a service along with all its operation implementations.
 // It implements Registerable and can be passed directly into NewWorker alongside
 // activities and workflows.

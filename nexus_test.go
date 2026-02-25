@@ -155,6 +155,37 @@ func TestNewWorkerWithNexusOperations(t *testing.T) {
 	})
 }
 
+func TestAsyncHandlerOperationDeclaration(t *testing.T) {
+	t.Run("basic declaration", func(t *testing.T) {
+		svc := NewService("test-svc")
+		op := NewAsyncHandlerOperation[testInput, testOutput](svc, "handler-op")
+		require.Equal(t, "handler-op", op.Name())
+	})
+
+	t.Run("panics on non-struct param", func(t *testing.T) {
+		svc := NewService("test-svc")
+		require.Panics(t, func() {
+			NewAsyncHandlerOperation[string, testOutput](svc, "op")
+		})
+	})
+
+	t.Run("panics on duplicate name", func(t *testing.T) {
+		svc := NewService("test-svc")
+		NewAsyncHandlerOperation[testInput, testOutput](svc, "op")
+		require.PanicsWithValue(t, "operation op already declared on service test-svc", func() {
+			NewAsyncHandlerOperation[testInput, testOutput](svc, "op")
+		})
+	})
+
+	t.Run("conflicts with other operation types", func(t *testing.T) {
+		svc := NewService("test-svc")
+		NewSyncOperation[testInput, testOutput](svc, "op")
+		require.PanicsWithValue(t, "operation op already declared on service test-svc", func() {
+			NewAsyncHandlerOperation[testInput, testOutput](svc, "op")
+		})
+	})
+}
+
 func TestOperationPanicIfNotStruct(t *testing.T) {
 	t.Run("sync non-struct param", func(t *testing.T) {
 		svc := NewService("test-svc")
