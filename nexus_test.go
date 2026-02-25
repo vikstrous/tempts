@@ -78,6 +78,27 @@ func TestWithImplementations(t *testing.T) {
 		)
 		require.ErrorContains(t, err, "operation op belongs to service svc1, not svc2")
 	})
+
+	t.Run("extra implementation", func(t *testing.T) {
+		svc := NewService("test-svc")
+		op1 := NewSyncOperation[testInput, testOutput](svc, "op1")
+
+		// Create a second Service with the same name that has an additional operation
+		svc2 := NewService("test-svc")
+		op2 := NewSyncOperation[testInput, testOutput](svc2, "op2")
+
+		// Passing op2's impl to svc.WithImplementations: op2 passes the name check
+		// but is not declared on svc, so it should be rejected as extra.
+		_, err := svc.WithImplementations(
+			op1.WithImplementation(func(ctx context.Context, input testInput, opts nexus.StartOperationOptions) (testOutput, error) {
+				return testOutput{}, nil
+			}),
+			op2.WithImplementation(func(ctx context.Context, input testInput, opts nexus.StartOperationOptions) (testOutput, error) {
+				return testOutput{}, nil
+			}),
+		)
+		require.ErrorContains(t, err, "extra implementation for operation op2 not declared on service test-svc")
+	})
 }
 
 func TestDuplicateOperationName(t *testing.T) {
@@ -432,4 +453,12 @@ func TestOperationExecutePanicsOnMismatchedClientService(t *testing.T) {
 			},
 		)
 	})
+}
+
+func TestNewClient(t *testing.T) {
+	svc := NewService("my-service")
+	_ = NewSyncOperation[testInput, testOutput](svc, "op")
+
+	c := svc.NewClient("my-endpoint")
+	require.Equal(t, "my-service", c.serviceName)
 }

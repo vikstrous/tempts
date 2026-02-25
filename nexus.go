@@ -346,6 +346,13 @@ func (s *Service) WithImplementations(ops ...OperationWithImpl) (*ServiceWithImp
 		}
 	}
 
+	// Verify no extra implementations are provided
+	for name := range provided {
+		if _, exists := s.operations[name]; !exists {
+			return nil, fmt.Errorf("extra implementation for operation %s not declared on service %s", name, s.name)
+		}
+	}
+
 	return &ServiceWithImpl{
 		service: s,
 		impl:    impl,
