@@ -245,6 +245,32 @@ func (op AsyncHandlerOperation[Param, Return]) WithImplementation(
 	}
 }
 
+// Run synchronously executes an async handler operation and returns the result.
+func (op AsyncHandlerOperation[Param, Return]) Run(
+	ctx workflow.Context,
+	c *NexusClient,
+	param Param,
+	opts workflow.NexusOperationOptions,
+) (Return, error) {
+	var result Return
+	future := op.Execute(ctx, c, param, opts)
+	err := future.Get(ctx, &result)
+	return result, err
+}
+
+// Execute asynchronously starts an async handler operation and returns a future.
+func (op AsyncHandlerOperation[Param, Return]) Execute(
+	ctx workflow.Context,
+	c *NexusClient,
+	param Param,
+	opts workflow.NexusOperationOptions,
+) workflow.NexusOperationFuture {
+	if err := validateServiceMatch(op.name, op.service, c); err != nil {
+		panic(err.Error())
+	}
+	return c.client.ExecuteOperation(ctx, op.name, param, opts)
+}
+
 // ServiceWithImpl holds a service along with all its operation implementations.
 // It implements Registerable and can be passed directly into NewWorker alongside
 // activities and workflows.

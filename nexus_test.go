@@ -230,6 +230,39 @@ func TestAsyncHandlerOperationWithImplementation(t *testing.T) {
 	})
 }
 
+func TestAsyncHandlerOperationClientValidation(t *testing.T) {
+	t.Run("panics on mismatched service", func(t *testing.T) {
+		svcA := NewService("service-a")
+		svcB := NewService("service-b")
+
+		opA := NewAsyncHandlerOperation[testInput, testOutput](svcA, "op")
+		_ = NewAsyncHandlerOperation[testInput, testOutput](svcB, "op")
+
+		clientB := &NexusClient{serviceName: svcB.name}
+
+		require.PanicsWithValue(
+			t,
+			"cannot execute operation op on service service-a with client for service service-b",
+			func() {
+				opA.Execute(nil, clientB, testInput{}, workflow.NexusOperationOptions{})
+			},
+		)
+	})
+
+	t.Run("panics on nil client", func(t *testing.T) {
+		svc := NewService("service-a")
+		op := NewAsyncHandlerOperation[testInput, testOutput](svc, "op")
+
+		require.PanicsWithValue(
+			t,
+			"cannot execute operation op on service service-a with nil Nexus client",
+			func() {
+				op.Execute(nil, nil, testInput{}, workflow.NexusOperationOptions{})
+			},
+		)
+	})
+}
+
 func TestOperationPanicIfNotStruct(t *testing.T) {
 	t.Run("sync non-struct param", func(t *testing.T) {
 		svc := NewService("test-svc")
