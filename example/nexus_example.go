@@ -144,3 +144,10 @@ func exampleNexusWorkerSetup() {
 		panic(err)
 	}
 }
+
+// Reference example functions to ensure they compile. They are not called from main.
+var (
+	_ = exampleCallerWorkflow
+	_ = exampleAsyncCallerWorkflow
+	_ = exampleNexusWorkerSetup
+)
