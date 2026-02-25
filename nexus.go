@@ -7,6 +7,7 @@ import (
 	"github.com/nexus-rpc/sdk-go/nexus"
 	"go.temporal.io/sdk/client"
 	"go.temporal.io/sdk/temporalnexus"
+	"go.temporal.io/sdk/worker"
 	"go.temporal.io/sdk/workflow"
 )
 
@@ -157,10 +158,21 @@ func (op AsyncOperation[Param, Return]) WithImplementation(
 }
 
 // ServiceWithImpl holds a service along with all its operation implementations.
-// It is passed to NewWorker to register the Nexus service.
+// It implements Registerable and can be passed directly into NewWorker alongside
+// activities and workflows.
 type ServiceWithImpl struct {
 	service *Service
 	impl    *nexus.Service
+}
+
+func (s *ServiceWithImpl) register(ar worker.Registry) {
+	if rns, ok := ar.(interface{ RegisterNexusService(*nexus.Service) }); ok {
+		rns.RegisterNexusService(s.impl)
+	}
+}
+
+func (s *ServiceWithImpl) validate(_ *Queue, _ *validationState) error {
+	return nil
 }
 
 // WithImplementations validates and bundles operation implementations for the service.

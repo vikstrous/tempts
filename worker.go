@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	nexusSDK "github.com/nexus-rpc/sdk-go/nexus"
 	"go.temporal.io/sdk/worker"
 )
 
@@ -12,7 +11,6 @@ import (
 type Worker struct {
 	queue         *Queue
 	registerables []Registerable
-	services      []*ServiceWithImpl
 }
 
 // Registerable can be created by calling WithImplementation() on activity or workflow definitions.
@@ -37,14 +35,17 @@ wrk, err := tempts.NewWorker(queueMain, []tempts.Registerable{
 	workflowTypeJustGreet.WithImplementation(workflowJustGreet),
 })
 
-For Nexus services:
+Nexus services implement Registerable and go in the same list:
 svc, err := myService.WithImplementations(
 	echoOp.WithImplementation(echoHandler),
 	processOp.WithImplementation(processWorkflow, processGetOptions),
 )
-wrk, err := tempts.NewWorker(queueMain, registerables, svc)
+wrk, err := tempts.NewWorker(queueMain, []tempts.Registerable{
+	workflowType.WithImplementation(workflowFn),
+	svc,
+})
 */
-func NewWorker(queue *Queue, registerables []Registerable, services ...*ServiceWithImpl) (*Worker, error) {
+func NewWorker(queue *Queue, registerables []Registerable) (*Worker, error) {
 	v := &validationState{
 		activitiesValidated: map[string]struct{}{},
 		workflowsValidated:  map[string]struct{}{},
@@ -75,7 +76,7 @@ func NewWorker(queue *Queue, registerables []Registerable, services ...*ServiceW
 			return nil, fmt.Errorf("an implementation for workflow %s provided, but not registered with queue", w)
 		}
 	}
-	return &Worker{queue: queue, registerables: registerables, services: services}, nil
+	return &Worker{queue: queue, registerables: registerables}, nil
 }
 
 // Register is useful in unit tests to define all of the worker's workflows and activities in the test environment.
@@ -85,26 +86,12 @@ func (w *Worker) Register(wrk worker.Registry) {
 	}
 }
 
-// registerNexusServices is an interface that worker.Worker implements for registering Nexus services.
-type registerNexusServices interface {
-	RegisterNexusService(service *nexusSDK.Service)
-}
-
-// RegisterNexusServices registers all Nexus services with the given worker.
-// This is called automatically by Run(), but is exposed for testing.
-func (w *Worker) RegisterNexusServices(wrk registerNexusServices) {
-	for _, svc := range w.services {
-		wrk.RegisterNexusService(svc.impl)
-	}
-}
-
 // Run starts the worker. To stop it, cancel the context. This function returns when the worker completes.
 // Make sure to always cancel the context eventually, or a goroutine will be leaked.
 func (w *Worker) Run(ctx context.Context, client *Client, options worker.Options) error {
 	options.DisableRegistrationAliasing = true
 	wrk := worker.New(client.Client, w.queue.name, options)
 	w.Register(wrk)
-	w.RegisterNexusServices(wrk)
 
 	go func() {
 		// There's no way to pass the channel from ctx.Done directly into Run because it's of the wrong type.

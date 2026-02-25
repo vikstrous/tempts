@@ -113,11 +113,11 @@ func exampleNexusWorkerSetup() {
 		panic(err)
 	}
 
-	// Create a worker with the Nexus service
-	// The processWorkflow needs to be registered as a regular workflow too
+	// Create a worker with the Nexus service alongside activities and workflows
 	_, err = tempts.NewWorker(queueMain, []tempts.Registerable{
 		// Register any activities and workflows needed
-	}, svc)
+		svc,
+	})
 	if err != nil {
 		panic(err)
 	}

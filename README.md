@@ -429,11 +429,14 @@ svc, err := myService.WithImplementations(
     }),
 )
 
-// Create worker with the Nexus service
-wrk, err := tempts.NewWorker(queueMain, registerables, svc)
+// Create worker with the Nexus service alongside activities and workflows
+wrk, err := tempts.NewWorker(queueMain, []tempts.Registerable{
+    workflowType.WithImplementation(workflowFn),
+    svc,
+})
 ```
 
-This ensures that all declared operations have implementations and no extra implementations are provided. A single operation object is used for both declaration and implementation, unlike the native SDK which requires separate `OperationReference[I, O]` objects.
+This ensures that all declared operations have implementations and no extra implementations are provided. A single operation object is used for both declaration and implementation, unlike the native SDK which requires separate `OperationReference[I, O]` objects. Nexus services implement `Registerable` and go in the same list as activities and workflows.
 
 ### Call Nexus operations from a workflow
 
