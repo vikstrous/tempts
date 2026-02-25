@@ -90,11 +90,6 @@ func (op *SyncOperationWithImpl[Param, Return]) validate(v *validationState) err
 	if _, ok := v.nexusServicesHandled[op.op.service]; ok {
 		return fmt.Errorf("nexus service %s has both bundled and individual operation implementations; use one or the other", op.op.service.name)
 	}
-	for _, existing := range v.nexusOps[op.op.service] {
-		if existing.getOperationName() == op.op.name {
-			return fmt.Errorf("duplicate implementation for operation %s on service %s", op.op.name, op.op.service.name)
-		}
-	}
 	v.nexusOps[op.op.service] = append(v.nexusOps[op.op.service], op)
 	return nil
 }
@@ -164,11 +159,6 @@ func (op *AsyncOperationWithImpl[Param, Return]) register(_ worker.Registry) {}
 func (op *AsyncOperationWithImpl[Param, Return]) validate(v *validationState) error {
 	if _, ok := v.nexusServicesHandled[op.op.service]; ok {
 		return fmt.Errorf("nexus service %s has both bundled and individual operation implementations; use one or the other", op.op.service.name)
-	}
-	for _, existing := range v.nexusOps[op.op.service] {
-		if existing.getOperationName() == op.op.name {
-			return fmt.Errorf("duplicate implementation for operation %s on service %s", op.op.name, op.op.service.name)
-		}
 	}
 	v.nexusOps[op.op.service] = append(v.nexusOps[op.op.service], op)
 	return nil
@@ -246,11 +236,6 @@ func (op *AsyncHandlerOperationWithImpl[Param, Return]) register(_ worker.Regist
 func (op *AsyncHandlerOperationWithImpl[Param, Return]) validate(v *validationState) error {
 	if _, ok := v.nexusServicesHandled[op.op.service]; ok {
 		return fmt.Errorf("nexus service %s has both bundled and individual operation implementations; use one or the other", op.op.service.name)
-	}
-	for _, existing := range v.nexusOps[op.op.service] {
-		if existing.getOperationName() == op.op.name {
-			return fmt.Errorf("duplicate implementation for operation %s on service %s", op.op.name, op.op.service.name)
-		}
 	}
 	v.nexusOps[op.op.service] = append(v.nexusOps[op.op.service], op)
 	return nil
@@ -335,7 +320,7 @@ func (s *Service) WithImplementations(ops ...OperationWithImpl) (*ServiceWithImp
 		svc := op.getService()
 
 		// Verify the operation belongs to this service
-		if svc != s {
+		if svc.name != s.name {
 			return nil, fmt.Errorf("operation %s belongs to service %s, not %s", name, svc.name, s.name)
 		}
 
