@@ -134,6 +134,8 @@ Nexus Operations:
 * Return the right response types
 * Registered handlers match the right type signature
 * All declared operations must have implementations (validated at service creation)
+* Parameter types must be structs (enforced at declaration time)
+* Operations can only be called with a client created from the same service
 
 ### Tools
 
@@ -431,12 +433,14 @@ svc, err := myService.WithImplementations(
 wrk, err := tempts.NewWorker(queueMain, registerables, svc)
 ```
 
-This ensures that all declared operations have implementations and no extra implementations are provided.
+This ensures that all declared operations have implementations and no extra implementations are provided. A single operation object is used for both declaration and implementation, unlike the native SDK which requires separate `OperationReference[I, O]` objects.
 
 ### Call Nexus operations from a workflow
 
 Instead of:
 ```go
+// Note: ExecuteOperation accepts `any` for both the operation name and input,
+// so mismatched types compile but fail at runtime.
 c := workflow.NewNexusClient("my-endpoint", "my-service")
 future := c.ExecuteOperation(ctx, "echo", input, workflow.NexusOperationOptions{})
 var result EchoOutput
@@ -457,7 +461,7 @@ var result EchoOutput
 err := future.Get(ctx, &result)
 ```
 
-This ensures that the operation is called with the correct parameter type and returns the correct result type.
+This ensures that the operation is called with the correct parameter type and returns the correct result type. The native SDK's `ExecuteOperation` accepts `any` for both operation and input, so mismatched types compile but fail at runtime. tempts enforces correct types at compile time via generics, and verifies the client matches the operation's service at runtime.
 
 ## Migration for Go SDK users
 
