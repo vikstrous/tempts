@@ -93,7 +93,7 @@ func nexusOperations() []tempts.Registerable {
 // exampleCallerWorkflow demonstrates calling Nexus operations from a workflow
 func exampleCallerWorkflow(ctx workflow.Context, message string) (string, error) {
 	// Create a client for the Nexus service
-	c := myNexusService.NewClient(ctx, "my-nexus-endpoint")
+	c := myNexusService.NewClient("my-nexus-endpoint")
 
 	// Call the sync operation
 	echoResult, err := echoOp.Run(ctx, c, EchoInput{Message: message}, workflow.NexusOperationOptions{})
@@ -112,7 +112,7 @@ func exampleCallerWorkflow(ctx workflow.Context, message string) (string, error)
 
 // exampleAsyncCallerWorkflow demonstrates async execution of Nexus operations
 func exampleAsyncCallerWorkflow(ctx workflow.Context, message string) (string, error) {
-	c := myNexusService.NewClient(ctx, "my-nexus-endpoint")
+	c := myNexusService.NewClient("my-nexus-endpoint")
 
 	// Start the operation asynchronously
 	future := processOp.Execute(ctx, c, ProcessInput{Data: message}, workflow.NexusOperationOptions{})

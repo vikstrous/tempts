@@ -37,7 +37,7 @@ func (s *Service) Name() string {
 type OperationWithImpl interface {
 	getOperationName() string
 	getService() *Service
-	toNexusOperation() nexus.RegisterableOperation
+	toNexusOperation() (nexus.RegisterableOperation, error)
 }
 
 // SyncOperation represents a synchronous Nexus operation (simple RPC-style).
@@ -80,13 +80,21 @@ func (op *SyncOperationWithImpl[Param, Return]) getService() *Service {
 	return op.op.service
 }
 
-func (op *SyncOperationWithImpl[Param, Return]) toNexusOperation() nexus.RegisterableOperation {
-	return nexus.NewSyncOperation(op.op.name, op.handler)
+func (op *SyncOperationWithImpl[Param, Return]) toNexusOperation() (nexus.RegisterableOperation, error) {
+	return nexus.NewSyncOperation(op.op.name, op.handler), nil
 }
 
 func (op *SyncOperationWithImpl[Param, Return]) register(_ worker.Registry) {}
 
 func (op *SyncOperationWithImpl[Param, Return]) validate(v *validationState) error {
+	if _, ok := v.nexusServicesHandled[op.op.service]; ok {
+		return fmt.Errorf("nexus service %s has both bundled and individual operation implementations; use one or the other", op.op.service.name)
+	}
+	for _, existing := range v.nexusOps[op.op.service] {
+		if existing.getOperationName() == op.op.name {
+			return fmt.Errorf("duplicate implementation for operation %s on service %s", op.op.name, op.op.service.name)
+		}
+	}
 	v.nexusOps[op.op.service] = append(v.nexusOps[op.op.service], op)
 	return nil
 }
@@ -143,17 +151,25 @@ func (op *AsyncOperationWithImpl[Param, Return]) getService() *Service {
 	return op.op.service
 }
 
-func (op *AsyncOperationWithImpl[Param, Return]) toNexusOperation() nexus.RegisterableOperation {
+func (op *AsyncOperationWithImpl[Param, Return]) toNexusOperation() (nexus.RegisterableOperation, error) {
 	return temporalnexus.NewWorkflowRunOperation(
 		op.op.name,
 		op.workflow,
 		op.getOptions,
-	)
+	), nil
 }
 
 func (op *AsyncOperationWithImpl[Param, Return]) register(_ worker.Registry) {}
 
 func (op *AsyncOperationWithImpl[Param, Return]) validate(v *validationState) error {
+	if _, ok := v.nexusServicesHandled[op.op.service]; ok {
+		return fmt.Errorf("nexus service %s has both bundled and individual operation implementations; use one or the other", op.op.service.name)
+	}
+	for _, existing := range v.nexusOps[op.op.service] {
+		if existing.getOperationName() == op.op.name {
+			return fmt.Errorf("duplicate implementation for operation %s on service %s", op.op.name, op.op.service.name)
+		}
+	}
 	v.nexusOps[op.op.service] = append(v.nexusOps[op.op.service], op)
 	return nil
 }
@@ -212,7 +228,7 @@ func (op *AsyncHandlerOperationWithImpl[Param, Return]) getService() *Service {
 	return op.op.service
 }
 
-func (op *AsyncHandlerOperationWithImpl[Param, Return]) toNexusOperation() nexus.RegisterableOperation {
+func (op *AsyncHandlerOperationWithImpl[Param, Return]) toNexusOperation() (nexus.RegisterableOperation, error) {
 	nop, err := temporalnexus.NewWorkflowRunOperationWithOptions(
 		temporalnexus.WorkflowRunOperationOptions[Param, Return]{
 			Name:    op.op.name,
@@ -220,14 +236,22 @@ func (op *AsyncHandlerOperationWithImpl[Param, Return]) toNexusOperation() nexus
 		},
 	)
 	if err != nil {
-		panic(fmt.Sprintf("failed to create nexus operation %s: %v", op.op.name, err))
+		return nil, fmt.Errorf("failed to create nexus operation %s: %w", op.op.name, err)
 	}
-	return nop
+	return nop, nil
 }
 
 func (op *AsyncHandlerOperationWithImpl[Param, Return]) register(_ worker.Registry) {}
 
 func (op *AsyncHandlerOperationWithImpl[Param, Return]) validate(v *validationState) error {
+	if _, ok := v.nexusServicesHandled[op.op.service]; ok {
+		return fmt.Errorf("nexus service %s has both bundled and individual operation implementations; use one or the other", op.op.service.name)
+	}
+	for _, existing := range v.nexusOps[op.op.service] {
+		if existing.getOperationName() == op.op.name {
+			return fmt.Errorf("duplicate implementation for operation %s on service %s", op.op.name, op.op.service.name)
+		}
+	}
 	v.nexusOps[op.op.service] = append(v.nexusOps[op.op.service], op)
 	return nil
 }
@@ -285,7 +309,14 @@ func (s *ServiceWithImpl) register(ar worker.Registry) {
 	}
 }
 
-func (s *ServiceWithImpl) validate(_ *validationState) error {
+func (s *ServiceWithImpl) validate(v *validationState) error {
+	if _, ok := v.nexusServicesHandled[s.service]; ok {
+		return fmt.Errorf("duplicate registration for nexus service %s", s.service.name)
+	}
+	if _, ok := v.nexusOps[s.service]; ok {
+		return fmt.Errorf("nexus service %s has both bundled and individual operation implementations; use one or the other", s.service.name)
+	}
+	v.nexusServicesHandled[s.service] = struct{}{}
 	return nil
 }
 
@@ -314,7 +345,11 @@ func (s *Service) WithImplementations(ops ...OperationWithImpl) (*ServiceWithImp
 		}
 		provided[name] = struct{}{}
 
-		if err := impl.Register(op.toNexusOperation()); err != nil {
+		nop, err := op.toNexusOperation()
+		if err != nil {
+			return nil, err
+		}
+		if err := impl.Register(nop); err != nil {
 			return nil, fmt.Errorf("failed to register operation %s: %w", name, err)
 		}
 	}
@@ -340,7 +375,7 @@ type NexusClient struct {
 
 // NewClient creates a NexusClient for calling operations on this service.
 // The endpoint parameter specifies the Nexus endpoint to use.
-func (s *Service) NewClient(ctx workflow.Context, endpoint string) *NexusClient {
+func (s *Service) NewClient(endpoint string) *NexusClient {
 	return &NexusClient{
 		client:      workflow.NewNexusClient(endpoint, s.name),
 		serviceName: s.name,
@@ -375,7 +410,7 @@ func (op SyncOperation[Param, Return]) Run(
 	return result, err
 }
 
-// Execute asynchronously starts a sync operation and returns a future.
+// Execute starts a sync operation and returns a future for the result.
 func (op SyncOperation[Param, Return]) Execute(
 	ctx workflow.Context,
 	c *NexusClient,

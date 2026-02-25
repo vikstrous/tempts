@@ -26,6 +26,8 @@ type validationState struct {
 	workflowsValidated  map[string]struct{}
 	// nexusOps groups operation implementations by their parent service.
 	nexusOps map[*Service][]OperationWithImpl
+	// nexusServicesHandled tracks services that were passed as pre-validated ServiceWithImpl.
+	nexusServicesHandled map[*Service]struct{}
 }
 
 // NewWorker defines a worker along with all of the workflows, activities and Nexus operations.
@@ -41,10 +43,11 @@ wrk, err := tempts.NewWorker(queueMain, []tempts.Registerable{
 */
 func NewWorker(queue *Queue, registerables []Registerable) (*Worker, error) {
 	v := &validationState{
-		queue:               queue,
-		activitiesValidated: map[string]struct{}{},
+		queue:                queue,
+		activitiesValidated:  map[string]struct{}{},
 		workflowsValidated:  map[string]struct{}{},
-		nexusOps:            map[*Service][]OperationWithImpl{},
+		nexusOps:             map[*Service][]OperationWithImpl{},
+		nexusServicesHandled: map[*Service]struct{}{},
 	}
 	for _, r := range registerables {
 		err := r.validate(v)

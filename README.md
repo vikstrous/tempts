@@ -459,7 +459,7 @@ err := future.Get(ctx, &result)
 Do:
 ```go
 // Using the globally defined service and operations
-c := myService.NewClient(ctx, "my-endpoint")
+c := myService.NewClient("my-endpoint")
 
 // Synchronous call
 result, err := echoOp.Run(ctx, c, EchoInput{Message: "hello"}, workflow.NexusOperationOptions{})
