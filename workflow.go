@@ -340,16 +340,6 @@ func setSchedule(ctx context.Context, temporalClient *Client, opts client.Schedu
 		}
 		return nil
 	}
-	// Memo and Note can be changed externally (e.g. by pausing/unpausing a
-	// schedule via the Temporal UI). Since the Update path below preserves the
-	// existing State (only overwriting Paused), mismatches in these fields are
-	// harmless — just log and continue instead of returning a fatal error.
-	if !(info.Memo == nil && len(opts.Memo) == 0) && !info.Memo.Equal(opts.Memo) {
-		fmt.Printf("SetSchedule %s: memo mismatch (provided %v, existing %v) — keeping existing memo\n", opts.ID, opts.Memo, info.Memo)
-	}
-	if info.Schedule.State.Note != opts.Note {
-		fmt.Printf("SetSchedule %s: note mismatch (provided %q, existing %q) — keeping existing note\n", opts.ID, opts.Note, info.Schedule.State.Note)
-	}
 
 	// Update anything we can
 	err = s.Update(ctx, client.ScheduleUpdateOptions{
