@@ -340,21 +340,6 @@ func setSchedule(ctx context.Context, temporalClient *Client, opts client.Schedu
 		}
 		return nil
 	}
-	// If not equal, error because we can't make them match?
-	// Don't compare if neither is set
-	if !(info.Memo == nil && len(opts.Memo) == 0) && !info.Memo.Equal(opts.Memo) {
-		// TODO: re-create the schedule in this case?
-		return fmt.Errorf("provided memo %s doesn't match schedule memo %s and there's no way to fix this without re-creating the schedule", opts.Memo, info.Memo)
-	}
-	if info.Schedule.State.Note != opts.Note {
-		// TODO: re-create the schedule in this case?
-		return fmt.Errorf("provided note %s doesn't match schedule note %s and there's no way to fix this without re-creating the schedule", opts.Note, info.Schedule.State.Note)
-	}
-	// Warning: comparing search attributes doesn't seem to work because temporal craetes its own even when none are provided, so it's not safe to simply compare them.
-	// if !info.SearchAttributes.Equal(opts.SearchAttributes) {
-	// 	// TODO: re-create the schedule in this case?
-	// 	return fmt.Errorf("provided search attributes %s doesn't match schedule search attributes %s and there's no way to fix this without re-creating the schedule", opts.SearchAttributes, info.SearchAttributes)
-	// }
 
 	// Update anything we can
 	err = s.Update(ctx, client.ScheduleUpdateOptions{
