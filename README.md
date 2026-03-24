@@ -392,6 +392,34 @@ There maybe more restrictions that I'm not aware of yet. Open an issue if any ar
 
 To simplify migration, if your workflows and activities don't use a single struct input type, use `NewWorkflowPositional`/`NewActivityPositional`. Don't use these functions in new code.
 
+## Claude Code Skill
+
+This repository includes a Claude Code skill that provides AI-assisted development guidance for building Temporal applications with tempts. The skill covers type declarations, worker setup, signals, queries, testing, Nexus operations, and migration from the standard Go SDK.
+
+### Installation
+
+#### Via `npx skills`
+
+```bash
+npx skills add vikstrous/tempts -s tempts-developer
+```
+
+#### Via manual clone
+
+```bash
+git clone https://github.com/vikstrous/tempts ~/.claude/skills/tempts-developer --no-checkout
+cd ~/.claude/skills/tempts-developer
+git sparse-checkout set skill
+git checkout
+```
+
+Or clone the full repo and symlink:
+
+```bash
+git clone https://github.com/vikstrous/tempts ~/tempts
+ln -s ~/tempts/skill ~/.claude/skills/tempts-developer
+```
+
 ## Potential future improvements
 
 * Return typed futures instead of generic ones
