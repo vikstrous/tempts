@@ -76,12 +76,19 @@ func (w *Worker) Register(wrk worker.Registry) {
 	}
 }
 
-// Run starts the worker. To stop it, cancel the context. This function returns when the worker completes.
-// Make sure to always cancel the context eventually, or a goroutine will be leaked.
-func (w *Worker) Run(ctx context.Context, client *Client, options worker.Options) error {
+// Build creates a configured Temporal SDK worker with all workflows and activities registered.
+// Use this when you need to manage the worker lifecycle yourself (e.g. with a custom runnable).
+func (w *Worker) Build(client *Client, options worker.Options) worker.Worker {
 	options.DisableRegistrationAliasing = true
 	wrk := worker.New(client.Client, w.queue.name, options)
 	w.Register(wrk)
+	return wrk
+}
+
+// Run starts the worker. To stop it, cancel the context. This function returns when the worker completes.
+// Make sure to always cancel the context eventually, or a goroutine will be leaked.
+func (w *Worker) Run(ctx context.Context, client *Client, options worker.Options) error {
+	wrk := w.Build(client, options)
 
 	// Use an interrupt channel instead of calling Stop() directly to avoid a race
 	// condition between Start() and Stop(). Run(interruptCh) calls Start()
