@@ -328,7 +328,7 @@ func setSchedule(ctx context.Context, temporalClient *Client, opts client.Schedu
 	opts.Action = a
 
 	s := temporalClient.Client.ScheduleClient().GetHandle(ctx, opts.ID)
-	info, err := s.Describe(ctx)
+	_, err := s.Describe(ctx)
 	if err != nil {
 		var notFound *serviceerror.NotFound
 		if !errors.As(err, &notFound) {

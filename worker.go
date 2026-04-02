@@ -83,10 +83,10 @@ func (w *Worker) Run(ctx context.Context, client *Client, options worker.Options
 	wrk := worker.New(client.Client, w.queue.name, options)
 	w.Register(wrk)
 
+	interruptCh := make(chan interface{})
 	go func() {
-		// There's no way to pass the channel from ctx.Done directly into Run because it's of the wrong type.
 		<-ctx.Done()
-		wrk.Stop()
+		close(interruptCh)
 	}()
-	return wrk.Run(nil)
+	return wrk.Run(interruptCh)
 }
