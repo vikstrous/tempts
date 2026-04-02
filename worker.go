@@ -83,10 +83,14 @@ func (w *Worker) Run(ctx context.Context, client *Client, options worker.Options
 	wrk := worker.New(client.Client, w.queue.name, options)
 	w.Register(wrk)
 
+	// Use an interrupt channel instead of calling Stop() directly to avoid a race
+	// condition between Start() and Stop(). Run(interruptCh) calls Start()
+	// synchronously before selecting on the channel, ensuring the worker is fully
+	// started before Stop() is called.
+	interruptCh := make(chan interface{})
 	go func() {
-		// There's no way to pass the channel from ctx.Done directly into Run because it's of the wrong type.
 		<-ctx.Done()
-		wrk.Stop()
+		close(interruptCh)
 	}()
-	return wrk.Run(nil)
+	return wrk.Run(interruptCh)
 }
