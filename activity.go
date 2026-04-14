@@ -21,13 +21,13 @@ func (a ActivityWithImpl) register(ar worker.Registry) {
 	ar.RegisterActivityWithOptions(a.fn, activity.RegisterOptions{Name: a.activityName})
 }
 
-func (a ActivityWithImpl) validate(q *Queue, v *validationState) error {
-	if a.queue.name != q.name {
-		return fmt.Errorf("activity for queue %s can't be registered on worker with queue %s", a.queue.name, q.name)
+func (a ActivityWithImpl) validate(v *validationState) error {
+	if a.queue.name != v.queue.name {
+		return fmt.Errorf("activity for queue %s can't be registered on worker with queue %s", a.queue.name, v.queue.name)
 	}
 	_, ok := v.activitiesValidated[a.activityName]
 	if ok {
-		return fmt.Errorf("duplicate activtity name %s for queue %s", a.activityName, q.name)
+		return fmt.Errorf("duplicate activtity name %s for queue %s", a.activityName, v.queue.name)
 	}
 	v.activitiesValidated[a.activityName] = struct{}{}
 	return nil

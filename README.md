@@ -128,6 +128,17 @@ Signals:
 * Are received with the right parameter types
 * SignalWithStart ensures both workflow and signal parameter types are correct
 
+Nexus Operations:
+
+* Registered handlers match the right type signature (also provided by the native Nexus SDK via generics)
+* Are called with the right parameter types (the native SDK's `ExecuteOperation` accepts `any`, so call-site type safety is only enforced by tempts)
+* Return the right response types (same as above — call-site only)
+* Are declared on a specific service
+* All declared operations must have implementations (validated at service creation)
+* Parameter types must be structs (enforced at declaration time)
+* Operations can only be called with a client created from the same service
+* Async handler operations allow operation input to differ from workflow input while maintaining type safety on the operation boundary
+
 ### Tools
 
 There are two functions in this library that make it easy to write fixture based replayability tests for your tempts workflows and activities.
@@ -380,6 +391,88 @@ This ensures that:
 * The workflow parameter type is correct for the workflow
 * The signal parameter type is correct for the signal
 * The signal is scoped to the correct workflow
+
+### Define and implement Nexus operations
+
+Instead of:
+```go
+// Define operations manually
+echoOp := nexus.NewSyncOperation("echo", func(ctx context.Context, input EchoInput, opts nexus.StartOperationOptions) (EchoOutput, error) {
+    return EchoOutput{Message: input.Message}, nil
+})
+
+processOp := temporalnexus.NewWorkflowRunOperation("process", processWorkflow, getOptions)
+
+// Create service and register
+service := nexus.NewService("my-service")
+service.Register(echoOp, processOp)
+worker.RegisterNexusService(service)
+```
+Do:
+```go
+// Globally define the service and operations (in a shared API package)
+var myService = tempts.NewService("my-service")
+
+type EchoInput struct { Message string }
+type EchoOutput struct { Message string }
+var echoOp = tempts.NewSyncOperation[EchoInput, EchoOutput](myService, "echo")
+
+type ProcessInput struct { Data string }
+type ProcessOutput struct { Result string }
+var processOp = tempts.NewAsyncOperation[ProcessInput, ProcessOutput](myService, "process")
+
+// Async handler operation - when operation input differs from workflow input
+type TransformInput struct { RawData string }
+type TransformOutput struct { Result string }
+var transformOp = tempts.NewAsyncHandlerOperation[TransformInput, TransformOutput](myService, "transform")
+
+// Operation implementations go directly into NewWorker alongside activities and workflows.
+// NewWorker groups them by service and validates that all declared operations have implementations.
+wrk, err := tempts.NewWorker(queueMain, []tempts.Registerable{
+    workflowType.WithImplementation(workflowFn),
+    echoOp.WithImplementation(func(ctx context.Context, input EchoInput, opts nexus.StartOperationOptions) (EchoOutput, error) {
+        return EchoOutput{Message: input.Message}, nil
+    }),
+    processOp.WithImplementation(processWorkflow, func(ctx context.Context, input ProcessInput, opts nexus.StartOperationOptions) (client.StartWorkflowOptions, error) {
+        return client.StartWorkflowOptions{ID: "process-" + opts.RequestID}, nil
+    }),
+    transformOp.WithImplementation(func(ctx context.Context, input TransformInput, opts nexus.StartOperationOptions) (temporalnexus.WorkflowHandle[TransformOutput], error) {
+        return temporalnexus.ExecuteWorkflow(ctx, opts, client.StartWorkflowOptions{
+            ID: "transform-" + opts.RequestID,
+        }, transformWorkflow, ProcessInput{Data: input.RawData})
+    }),
+})
+```
+
+This ensures that all declared operations have implementations and no extra implementations are provided. A single operation object is used for both declaration and implementation, unlike the native SDK which requires separate `OperationReference[I, O]` objects.
+
+### Call Nexus operations from a workflow
+
+Instead of:
+```go
+// Note: ExecuteOperation accepts `any` for both the operation name and input,
+// so mismatched types compile but fail at runtime.
+c := workflow.NewNexusClient("my-endpoint", "my-service")
+future := c.ExecuteOperation(ctx, "echo", input, workflow.NexusOperationOptions{})
+var result EchoOutput
+err := future.Get(ctx, &result)
+```
+Do:
+```go
+// Using the globally defined service and operations
+c := myService.NewClient("my-endpoint")
+
+// Synchronous call
+result, err := echoOp.Run(ctx, c, EchoInput{Message: "hello"}, workflow.NexusOperationOptions{})
+
+// Or async call
+future := echoOp.Execute(ctx, c, EchoInput{Message: "hello"}, workflow.NexusOperationOptions{})
+// ... do other work ...
+var result EchoOutput
+err := future.Get(ctx, &result)
+```
+
+This ensures that the operation is called with the correct parameter type and returns the correct result type. The native SDK's `ExecuteOperation` accepts `any` for both operation and input, so mismatched types compile but fail at runtime. tempts enforces correct types at compile time via generics, and verifies the client matches the operation's service at runtime.
 
 ## Migration for Go SDK users
 
