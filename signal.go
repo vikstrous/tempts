@@ -2,6 +2,7 @@ package tempts
 
 import (
 	"context"
+	"reflect"
 
 	"go.temporal.io/sdk/client"
 	"go.temporal.io/sdk/workflow"
@@ -95,6 +96,21 @@ func (s *WorkflowSignal[WP, WR, SP]) SignalWithStart(
 	signalParam SP,
 ) (client.WorkflowRun, error) {
 	opts.TaskQueue = s.workflow.queue.name
+
+	var workflowArgs []any
+	if !s.workflow.positional {
+		workflowArgs = []any{workflowParam}
+	} else {
+		paramVal := reflect.ValueOf(workflowParam)
+		if paramVal.Kind() == reflect.Ptr {
+			paramVal = paramVal.Elem()
+		}
+		workflowArgs = make([]any, paramVal.NumField())
+		for i := 0; i < paramVal.NumField(); i++ {
+			workflowArgs[i] = paramVal.Field(i).Interface()
+		}
+	}
+
 	return temporalClient.Client.SignalWithStartWorkflow(
 		ctx,
 		opts.ID,
@@ -102,6 +118,6 @@ func (s *WorkflowSignal[WP, WR, SP]) SignalWithStart(
 		signalParam,
 		opts,
 		s.workflow.name,
-		workflowParam,
+		workflowArgs...,
 	)
 }
