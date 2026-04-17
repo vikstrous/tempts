@@ -323,8 +323,7 @@ func TestIntegrationDecodeErrorBlocksThenRecovers(t *testing.T) {
 	switchableDecodeFailure.Store(false)
 	t.Log("Phase 2: Decode fixed, starting new worker")
 
-	ctx2, cancel2 := context.WithCancel(context.Background())
-	defer cancel2()
+	ctx2 := t.Context()
 	startSwitchableWorker(t, ctx2, c)
 
 	// Wait for the workflow to complete

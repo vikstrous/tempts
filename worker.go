@@ -45,7 +45,7 @@ func NewWorker(queue *Queue, registerables []Registerable) (*Worker, error) {
 	v := &validationState{
 		queue:                queue,
 		activitiesValidated:  map[string]struct{}{},
-		workflowsValidated:  map[string]struct{}{},
+		workflowsValidated:   map[string]struct{}{},
 		nexusOps:             map[string][]OperationWithImpl{},
 		nexusServicesHandled: map[string]struct{}{},
 	}
@@ -111,7 +111,7 @@ func (w *Worker) Run(ctx context.Context, client *Client, options worker.Options
 	wrk := worker.New(client.Client, w.queue.name, options)
 	w.Register(wrk)
 
-	interruptCh := make(chan interface{})
+	interruptCh := make(chan any)
 	go func() {
 		<-ctx.Done()
 		close(interruptCh)
