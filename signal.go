@@ -102,7 +102,7 @@ func (s *WorkflowSignal[WP, WR, SP]) SignalWithStart(
 		workflowArgs = []any{workflowParam}
 	} else {
 		paramVal := reflect.ValueOf(workflowParam)
-		if paramVal.Kind() == reflect.Ptr {
+		if paramVal.Kind() == reflect.Pointer {
 			paramVal = paramVal.Elem()
 		}
 		workflowArgs = make([]any, paramVal.NumField())
