@@ -36,13 +36,10 @@ func TestWorkerRunReturnsOnContextCancel(t *testing.T) {
 		done <- wrk.Run(ctx, c, worker.Options{})
 	}()
 
-	// Let the worker start, then cancel.
-	time.Sleep(200 * time.Millisecond)
 	cancel()
 
 	select {
 	case <-done:
-		// Worker returned - good.
 	case <-time.After(5 * time.Second):
 		t.Fatal("Worker.Run did not return after context cancellation")
 	}
