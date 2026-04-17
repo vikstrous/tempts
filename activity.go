@@ -57,21 +57,21 @@ func NewActivityPositional[Param, Return any](q *Queue, name string) Activity[Pa
 	panicIfNotStruct[Param]("NewActivityPositional")
 
 	// Get the type information for the Param struct
-	paramType := reflect.TypeOf((*Param)(nil)).Elem()
-	if paramType.Kind() == reflect.Ptr {
+	paramType := reflect.TypeFor[Param]()
+	if paramType.Kind() == reflect.Pointer {
 		paramType = paramType.Elem()
 	}
 
 	// Create a slice of function parameter types: (context.Context, field1Type, field2Type, ...)
 	paramTypes := make([]reflect.Type, paramType.NumField()+1)
-	paramTypes[0] = reflect.TypeOf((*context.Context)(nil)).Elem()
+	paramTypes[0] = reflect.TypeFor[context.Context]()
 	for i := 0; i < paramType.NumField(); i++ {
 		paramTypes[i+1] = paramType.Field(i).Type
 	}
 
 	// Create the function type: func(context.Context, field1Type, field2Type, ...) (Return, error)
-	returnType := reflect.TypeOf((*Return)(nil)).Elem()
-	errorType := reflect.TypeOf((*error)(nil)).Elem()
+	returnType := reflect.TypeFor[Return]()
+	errorType := reflect.TypeFor[error]()
 	fnType := reflect.FuncOf(paramTypes, []reflect.Type{returnType, errorType}, false)
 
 	// Create a function that panics with the message "Function execution not mocked"
@@ -86,8 +86,8 @@ func NewActivityPositional[Param, Return any](q *Queue, name string) Activity[Pa
 }
 
 func panicIfNotStruct[Param any](funcName string) {
-	paramType := reflect.TypeOf((*Param)(nil)).Elem()
-	if paramType.Kind() == reflect.Ptr {
+	paramType := reflect.TypeFor[Param]()
+	if paramType.Kind() == reflect.Pointer {
 		paramType = paramType.Elem()
 	}
 	if paramType.Kind() != reflect.Struct {
@@ -96,7 +96,7 @@ func panicIfNotStruct[Param any](funcName string) {
 }
 
 func extractFieldTypes(structType reflect.Type) []reflect.Type {
-	if structType.Kind() == reflect.Ptr {
+	if structType.Kind() == reflect.Pointer {
 		structType = structType.Elem()
 	}
 	if structType.Kind() != reflect.Struct {
@@ -117,9 +117,9 @@ func (a Activity[Param, Return]) WithImplementation(fn func(context.Context, Par
 	}
 
 	// For positional activities, create a wrapper function that converts positional arguments to a struct
-	paramType := reflect.TypeOf((*Param)(nil)).Elem()
+	paramType := reflect.TypeFor[Param]()
 	var fieldTypes []reflect.Type
-	if paramType.Kind() == reflect.Ptr {
+	if paramType.Kind() == reflect.Pointer {
 		fieldTypes = extractFieldTypes(paramType.Elem())
 	} else {
 		fieldTypes = extractFieldTypes(paramType)
@@ -127,8 +127,8 @@ func (a Activity[Param, Return]) WithImplementation(fn func(context.Context, Par
 
 	wrapper := reflect.MakeFunc(
 		reflect.FuncOf(
-			append([]reflect.Type{reflect.TypeOf((*context.Context)(nil)).Elem()}, fieldTypes...),
-			[]reflect.Type{reflect.TypeOf((*Return)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()},
+			append([]reflect.Type{reflect.TypeFor[context.Context]()}, fieldTypes...),
+			[]reflect.Type{reflect.TypeFor[Return](), reflect.TypeFor[error]()},
 			false,
 		),
 		func(args []reflect.Value) []reflect.Value {
@@ -136,7 +136,7 @@ func (a Activity[Param, Return]) WithImplementation(fn func(context.Context, Par
 
 			// Create a new instance of the Param struct
 			var paramVal reflect.Value
-			if paramType.Kind() == reflect.Ptr {
+			if paramType.Kind() == reflect.Pointer {
 				paramVal = reflect.New(paramType.Elem())
 				// Fill the struct fields with the positional arguments
 				for i := 0; i < paramType.Elem().NumField(); i++ {
@@ -167,11 +167,11 @@ func (a Activity[Param, Return]) Execute(ctx workflow.Context, param Param) work
 
 	// For positional activities, extract struct fields into separate arguments
 	paramVal := reflect.ValueOf(param)
-	if paramVal.Kind() == reflect.Ptr {
+	if paramVal.Kind() == reflect.Pointer {
 		paramVal = paramVal.Elem()
 	}
 
-	args := make([]interface{}, paramVal.NumField())
+	args := make([]any, paramVal.NumField())
 	for i := 0; i < paramVal.NumField(); i++ {
 		args[i] = paramVal.Field(i).Interface()
 	}

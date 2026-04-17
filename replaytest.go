@@ -142,9 +142,9 @@ func (w Workflow[Param, Return]) ReplayWorkflow(historiesBytes []byte, fn func(w
 		return replayWorkflow(historiesBytes, fn, opts)
 	}
 
-	paramType := reflect.TypeOf((*Param)(nil)).Elem()
+	paramType := reflect.TypeFor[Param]()
 	var fieldTypes []reflect.Type
-	if paramType.Kind() == reflect.Ptr {
+	if paramType.Kind() == reflect.Pointer {
 		fieldTypes = extractFieldTypes(paramType.Elem())
 	} else {
 		fieldTypes = extractFieldTypes(paramType)
@@ -153,13 +153,13 @@ func (w Workflow[Param, Return]) ReplayWorkflow(historiesBytes []byte, fn func(w
 	fnVal := reflect.ValueOf(fn)
 	wrapper := reflect.MakeFunc(
 		reflect.FuncOf(
-			append([]reflect.Type{reflect.TypeOf((*workflow.Context)(nil)).Elem()}, fieldTypes...),
-			[]reflect.Type{reflect.TypeOf((*Return)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()},
+			append([]reflect.Type{reflect.TypeFor[workflow.Context]()}, fieldTypes...),
+			[]reflect.Type{reflect.TypeFor[Return](), reflect.TypeFor[error]()},
 			false,
 		),
 		func(args []reflect.Value) []reflect.Value {
 			var paramVal reflect.Value
-			if paramType.Kind() == reflect.Ptr {
+			if paramType.Kind() == reflect.Pointer {
 				paramVal = reflect.New(paramType.Elem())
 				for i := 0; i < paramType.Elem().NumField(); i++ {
 					paramVal.Elem().Field(i).Set(args[i+1])

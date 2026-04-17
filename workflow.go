@@ -57,8 +57,8 @@ func (w WorkflowWithImpl[Param, Return]) validate(v *validationState) error {
 }
 
 type testEnvironment interface {
-	ExecuteWorkflow(workflowFn interface{}, args ...interface{})
-	GetWorkflowResult(valuePtr interface{}) error
+	ExecuteWorkflow(workflowFn any, args ...any)
+	GetWorkflowResult(valuePtr any) error
 	GetWorkflowError() error
 }
 
@@ -110,23 +110,23 @@ func NewWorkflowPositional[Param any, Return any](queue *Queue, name string) Wor
 	panicIfNotStruct[Param]("NewWorkflowPositional")
 
 	// Get the type information for the Param struct
-	paramType := reflect.TypeOf((*Param)(nil)).Elem()
+	paramType := reflect.TypeFor[Param]()
 
 	// Create a slice of function parameter types: (context.Context, field1Type, field2Type, ...)
 	var fieldTypes []reflect.Type
-	if paramType.Kind() == reflect.Ptr {
+	if paramType.Kind() == reflect.Pointer {
 		fieldTypes = extractFieldTypes(paramType.Elem())
 	} else {
 		fieldTypes = extractFieldTypes(paramType)
 	}
 
 	paramTypes := make([]reflect.Type, len(fieldTypes)+1)
-	paramTypes[0] = reflect.TypeOf((*workflow.Context)(nil)).Elem()
+	paramTypes[0] = reflect.TypeFor[workflow.Context]()
 	copy(paramTypes[1:], fieldTypes)
 
 	// Create the function type: func(workflow.Context, field1Type, field2Type, ...) (Return, error)
-	returnType := reflect.TypeOf((*Return)(nil)).Elem()
-	errorType := reflect.TypeOf((*error)(nil)).Elem()
+	returnType := reflect.TypeFor[Return]()
+	errorType := reflect.TypeFor[error]()
 	fnType := reflect.FuncOf(paramTypes, []reflect.Type{returnType, errorType}, false)
 
 	// Create a function that panics with the message "Function execution not mocked"
@@ -169,9 +169,9 @@ func (w Workflow[Param, Return]) WithImplementation(fn func(workflow.Context, Pa
 	}
 
 	// For positional workflows, create a wrapper function that converts positional arguments to a struct
-	paramType := reflect.TypeOf((*Param)(nil)).Elem()
+	paramType := reflect.TypeFor[Param]()
 	var fieldTypes []reflect.Type
-	if paramType.Kind() == reflect.Ptr {
+	if paramType.Kind() == reflect.Pointer {
 		fieldTypes = extractFieldTypes(paramType.Elem())
 	} else {
 		fieldTypes = extractFieldTypes(paramType)
@@ -179,8 +179,8 @@ func (w Workflow[Param, Return]) WithImplementation(fn func(workflow.Context, Pa
 
 	wrapper := reflect.MakeFunc(
 		reflect.FuncOf(
-			append([]reflect.Type{reflect.TypeOf((*workflow.Context)(nil)).Elem()}, fieldTypes...),
-			[]reflect.Type{reflect.TypeOf((*Return)(nil)).Elem(), reflect.TypeOf((*error)(nil)).Elem()},
+			append([]reflect.Type{reflect.TypeFor[workflow.Context]()}, fieldTypes...),
+			[]reflect.Type{reflect.TypeFor[Return](), reflect.TypeFor[error]()},
 			false,
 		),
 		func(args []reflect.Value) []reflect.Value {
@@ -188,7 +188,7 @@ func (w Workflow[Param, Return]) WithImplementation(fn func(workflow.Context, Pa
 
 			// Create a new instance of the Param struct
 			var paramVal reflect.Value
-			if paramType.Kind() == reflect.Ptr {
+			if paramType.Kind() == reflect.Pointer {
 				paramVal = reflect.New(paramType.Elem())
 				// Fill the struct fields with the positional arguments
 				for i := 0; i < paramType.Elem().NumField(); i++ {
@@ -247,11 +247,11 @@ func (w Workflow[Param, Return]) Execute(ctx context.Context, temporalClient *Cl
 
 	// For positional workflows, extract struct fields into separate arguments
 	paramVal := reflect.ValueOf(param)
-	if paramVal.Kind() == reflect.Ptr {
+	if paramVal.Kind() == reflect.Pointer {
 		paramVal = paramVal.Elem()
 	}
 
-	args := make([]interface{}, paramVal.NumField())
+	args := make([]any, paramVal.NumField())
 	for i := 0; i < paramVal.NumField(); i++ {
 		args[i] = paramVal.Field(i).Interface()
 	}
@@ -278,11 +278,11 @@ func (w Workflow[Param, Return]) ExecuteChild(ctx workflow.Context, opts workflo
 
 	// For positional workflows, extract struct fields into separate arguments
 	paramVal := reflect.ValueOf(param)
-	if paramVal.Kind() == reflect.Ptr {
+	if paramVal.Kind() == reflect.Pointer {
 		paramVal = paramVal.Elem()
 	}
 
-	args := make([]interface{}, paramVal.NumField())
+	args := make([]any, paramVal.NumField())
 	for i := 0; i < paramVal.NumField(); i++ {
 		args[i] = paramVal.Field(i).Interface()
 	}
@@ -302,7 +302,7 @@ func (w Workflow[Param, Return]) SetSchedule(ctx context.Context, temporalClient
 	} else {
 		// For positional workflows, extract struct fields into separate arguments
 		paramVal := reflect.ValueOf(param)
-		if paramVal.Kind() == reflect.Ptr {
+		if paramVal.Kind() == reflect.Pointer {
 			paramVal = paramVal.Elem()
 		}
 
